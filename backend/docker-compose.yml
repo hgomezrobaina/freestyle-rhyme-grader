@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: freestyle_postgres
+    environment:
+      POSTGRES_USER: freestyle_user
+      POSTGRES_PASSWORD: freestyle_password
+      POSTGRES_DB: freestyle_callificator
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U freestyle_user -d freestyle_callificator"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - freestyle_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: freestyle_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - freestyle_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: freestyle_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://freestyle_user:freestyle_password@postgres:5432/freestyle_callificator
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SQLALCHEMY_ECHO: "False"
+      DEBUG: "False"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - freestyle_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  freestyle_network:
+    driver: bridge
