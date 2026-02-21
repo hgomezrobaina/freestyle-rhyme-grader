@@ -25,10 +25,14 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
     Returns:
         Dictionary with speaker segments and timeline
     """
+    def _update(state, meta):
+        if self.request.id:
+            self.update_state(state=state, meta=meta)
+
     db = SessionLocal()
     try:
-        logger.info(f"Task {self.request.id}: Starting diarization for battle {battle_id}")
-        self.update_state(state='PROCESSING', meta={'status': 'Identifying speakers...'})
+        logger.info(f"Starting diarization for battle {battle_id}")
+        _update('PROCESSING', {'status': 'Identifying speakers...'})
 
         # Verify file exists
         audio_file = Path(audio_path)
@@ -41,7 +45,7 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
 
         # Load pipeline
         logger.info("Loading Pyannote pipeline...")
-        self.update_state(state='PROCESSING', meta={'status': 'Loading speaker diarization model...'})
+        _update('PROCESSING', {'status': 'Loading speaker diarization model...'})
 
         try:
             pipeline = Pipeline.from_pretrained(
@@ -61,7 +65,7 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
 
         # Apply diarization
         logger.info("Applying speaker diarization...")
-        self.update_state(state='PROCESSING', meta={'status': 'Processing audio...'})
+        _update('PROCESSING', {'status': 'Processing audio...'})
 
         diarization = pipeline(audio_path)
 
@@ -103,11 +107,6 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
 
     except Exception as e:
         logger.error(f"Diarization failed for battle {battle_id}: {str(e)}", exc_info=True)
-        battle = db.query(Battle).filter(Battle.id == battle_id).first()
-        if battle:
-            from app.models.battle import BattleStatus
-            battle.status = BattleStatus.FAILED
-            db.commit()
         raise
 
     finally:

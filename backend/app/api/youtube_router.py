@@ -2,7 +2,7 @@
 API routes for YouTube battle creation.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.schema import BattleResponse
@@ -29,8 +29,7 @@ async def create_battle_from_youtube(
     url: str,
     title: str,
     description: str = None,
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None
+    db: Session = Depends(get_db)
 ):
     """
     Create a battle from a YouTube URL.
@@ -74,17 +73,8 @@ async def create_battle_from_youtube(
 
         logger.info(f"Created battle {battle.id} from YouTube URL: {url}")
 
-        # Queue processing task
-        if background_tasks:
-            background_tasks.add_task(
-                process_pipeline,
-                battle.id,
-                "youtube",
-                url
-            )
-        else:
-            # Fallback: use Celery directly
-            process_pipeline.delay(battle.id, "youtube", url)
+        # Queue processing task via Celery
+        process_pipeline.delay(battle.id, "youtube", url)
 
         logger.info(f"Queued processing for battle {battle.id}")
 
@@ -127,6 +117,7 @@ async def get_battle_status(battle_id: int, db: Session = Depends(get_db)):
         "id": battle.id,
         "title": battle.title,
         "status": battle.status.value,
+        "progress_step": battle.progress_step.value if battle.progress_step else None,
         "verses_count": len(verses),
         "created_at": battle.created_at,
         "updated_at": battle.updated_at,

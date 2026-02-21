@@ -24,10 +24,14 @@ def transcribe_audio(self, battle_id: int, audio_path: str) -> dict:
     Returns:
         Dictionary with transcription and segments
     """
+    def _update(state, meta):
+        if self.request.id:
+            self.update_state(state=state, meta=meta)
+
     db = SessionLocal()
     try:
-        logger.info(f"Task {self.request.id}: Starting transcription for battle {battle_id}")
-        self.update_state(state='PROCESSING', meta={'status': 'Transcribing audio...'})
+        logger.info(f"Starting transcription for battle {battle_id}")
+        _update('PROCESSING', {'status': 'Transcribing audio...'})
 
         # Verify file exists
         audio_file = Path(audio_path)
@@ -36,12 +40,12 @@ def transcribe_audio(self, battle_id: int, audio_path: str) -> dict:
 
         # Load Whisper model
         logger.info("Loading Whisper model (large-v3)...")
-        self.update_state(state='PROCESSING', meta={'status': 'Loading Whisper model...'})
+        _update('PROCESSING', {'status': 'Loading Whisper model...'})
         model = whisper.load_model("large-v3")
 
         # Transcribe
         logger.info(f"Transcribing: {audio_path}")
-        self.update_state(state='PROCESSING', meta={'status': 'Transcribing audio (this may take a few minutes)...'})
+        _update('PROCESSING', {'status': 'Transcribing audio (this may take a few minutes)...'})
         result = model.transcribe(audio_path, language="es")
 
         logger.info(f"Transcription completed")
@@ -74,11 +78,6 @@ def transcribe_audio(self, battle_id: int, audio_path: str) -> dict:
 
     except Exception as e:
         logger.error(f"Transcription failed for battle {battle_id}: {str(e)}", exc_info=True)
-        battle = db.query(Battle).filter(Battle.id == battle_id).first()
-        if battle:
-            from app.models.battle import BattleStatus
-            battle.status = BattleStatus.FAILED
-            db.commit()
         raise
 
     finally:

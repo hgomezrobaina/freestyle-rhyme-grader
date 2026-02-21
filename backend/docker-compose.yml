@@ -48,8 +48,11 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       SQLALCHEMY_ECHO: "False"
       DEBUG: "False"
+      PYTHONPATH: /app
       PYTHONUNBUFFERED: "1"
     volumes:
+      - ./app:/app/app
+      - ./analysis:/app/analysis
       - ./uploads:/app/uploads
       - ./temp:/app/temp
       - ./logs:/app/logs
@@ -60,7 +63,33 @@ services:
         condition: service_healthy
     networks:
       - freestyle_network
-    restart: unless-stopped
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: freestyle_celery_worker
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: postgresql://freestyle_user:freestyle_password@postgres:5432/freestyle_callificator
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./app:/app/app
+      - ./analysis:/app/analysis
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - freestyle_network
 
 volumes:
   postgres_data:

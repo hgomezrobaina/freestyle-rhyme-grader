@@ -10,6 +10,13 @@ class BattleStatus(str, enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class PipelineStep(str, enum.Enum):
+    DOWNLOAD = "download"
+    TRANSCRIBE = "transcribe"
+    SEPARATE = "separate"
+    DIARIZE = "diarize"
+    ANALYZE = "analyze"
+
 class BattleSourceType(str, enum.Enum):
     YOUTUBE = "youtube"
     UPLOAD = "upload"
@@ -32,6 +39,7 @@ class Battle(Base):
     description = Column(String, nullable=True)
     source_type = Column(SQLEnum(BattleSourceType))
     status = Column(SQLEnum(BattleStatus), default=BattleStatus.PENDING, index=True)
+    progress_step = Column(SQLEnum(PipelineStep), nullable=True, default=None)
     source_url = Column(String, nullable=True)  # YouTube URL, file path, etc.
 
     # Fase 4: Battle Context and Metadata
@@ -51,7 +59,7 @@ class Battle(Base):
     battle_type = Column(String, nullable=True)  # "Octavos", "Cuartos", "Semifinal", "Final", "Clasificatoria"
 
     # Additional metadata as JSON for flexibility
-    metadata = Column(JSON, default={})  # {"judges": [...], "audience_votes": 0, "notable_moments": [...]}
+    battle_metadata = Column("metadata", JSON, default={})  # {"judges": [...], "audience_votes": 0, "notable_moments": [...]}
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

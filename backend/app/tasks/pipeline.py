@@ -6,12 +6,11 @@ import logging
 from celery import chain, group
 from app.workers.celery_app import celery_app
 from app.database import SessionLocal
-from app.models.battle import Battle, Verse, BattleStatus
-from app.tasks.download import download_youtube_video, save_uploaded_file
+from app.models.battle import Battle, BattleStatus, PipelineStep
+from app.tasks.download import download_youtube_video
 from app.tasks.transcription import transcribe_audio
 from app.tasks.voice_separation import separate_voices
 from app.tasks.diarization import diarize_speakers
-from app.services.battle_service import BattleService
 from analysis.rhyme.metrics import RhymeMetricsCalculator
 
 logger = logging.getLogger(__name__)
@@ -37,12 +36,21 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         Dictionary with final results
     """
     db = SessionLocal()
+
+    def _set_step(step: PipelineStep):
+        """Persist the current pipeline step to the database."""
+        db.query(Battle).filter(Battle.id == battle_id).update(
+            {Battle.progress_step: step}
+        )
+        db.commit()
+
     try:
         logger.info(f"Pipeline started for battle {battle_id}")
         self.update_state(state='PROCESSING', meta={'current_step': 'Starting pipeline...'})
 
         # Step 1: Download or save file
         logger.info(f"Step 1: {source_type.upper()} download/save")
+        _set_step(PipelineStep.DOWNLOAD)
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 1/5: Preparing audio...'})
 
         if source_type == "youtube":
@@ -58,6 +66,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
 
         # Step 2: Transcribe
         logger.info("Step 2: Transcription")
+        _set_step(PipelineStep.TRANSCRIBE)
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 2/5: Transcribing audio...'})
 
         transcription_result = transcribe_audio(battle_id, audio_path)
@@ -68,6 +77,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
 
         # Step 3: Voice separation (optional, for now skip if it fails)
         logger.info("Step 3: Voice separation")
+        _set_step(PipelineStep.SEPARATE)
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 3/5: Separating voices...'})
 
         try:
@@ -79,6 +89,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
 
         # Step 4: Diarization
         logger.info("Step 4: Speaker diarization")
+        _set_step(PipelineStep.DIARIZE)
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 4/5: Identifying speakers...'})
 
         diarization_result = diarize_speakers(battle_id, audio_path)
@@ -89,6 +100,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
 
         # Step 5: Segment verses and analyze
         logger.info("Step 5: Verse segmentation and analysis")
+        _set_step(PipelineStep.ANALYZE)
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 5/5: Analyzing verses...'})
 
         verses = segment_verses(
@@ -104,6 +116,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         battle = db.query(Battle).filter(Battle.id == battle_id).first()
         if battle:
             battle.status = BattleStatus.COMPLETED
+            battle.progress_step = None
             db.commit()
 
         result = {
@@ -115,14 +128,25 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         }
 
         logger.info(f"Pipeline completed successfully for battle {battle_id}")
+
         return result
 
     except Exception as e:
         logger.error(f"Pipeline failed for battle {battle_id}: {str(e)}", exc_info=True)
-        battle = db.query(Battle).filter(Battle.id == battle_id).first()
-        if battle:
-            battle.status = BattleStatus.FAILED
-            db.commit()
+        # Use a fresh session to guarantee the status update commits
+        # (the main session may be in a broken state after the error)
+        fail_db = SessionLocal()
+        try:
+            battle = fail_db.query(Battle).filter(Battle.id == battle_id).first()
+            if battle:
+                battle.status = BattleStatus.FAILED
+                fail_db.commit()
+                logger.info(f"Battle {battle_id} marked as FAILED")
+        except Exception as db_err:
+            logger.error(f"Could not mark battle {battle_id} as FAILED: {db_err}")
+            fail_db.rollback()
+        finally:
+            fail_db.close()
         raise
 
     finally:
@@ -245,6 +269,7 @@ def segment_verses(
 
         db.commit()
         logger.info(f"Segmented {len(verses)} verses for battle {battle_id}")
+
         return verses
 
     except Exception as e:

@@ -31,10 +31,14 @@ def evaluate_verse_semantic(
     Returns:
         Dictionary with semantic metrics
     """
+    def _update(state, meta):
+        if self.request.id:
+            self.update_state(state=state, meta=meta)
+
     db = SessionLocal()
     try:
-        logger.info(f"Task {self.request.id}: Starting semantic evaluation for verse {verse_id}")
-        self.update_state(state="PROCESSING", meta={"status": "Loading LLM model..."})
+        logger.info(f"Starting semantic evaluation for verse {verse_id}")
+        _update("PROCESSING", {"status": "Loading LLM model..."})
 
         # Get the verse
         verse = db.query(Verse).filter(Verse.id == verse_id).first()
@@ -52,7 +56,7 @@ def evaluate_verse_semantic(
 
         # Evaluate punchlines
         logger.info("Evaluating punchlines...")
-        self.update_state(state="PROCESSING", meta={"status": "Evaluating punchlines..."})
+        _update("PROCESSING", {"status": "Evaluating punchlines..."})
         punchline_result = judge.evaluate_punchline(
             verse.text,
             context=context,
@@ -61,7 +65,7 @@ def evaluate_verse_semantic(
 
         # Evaluate cleverness
         logger.info("Evaluating cleverness...")
-        self.update_state(state="PROCESSING", meta={"status": "Evaluating cleverness..."})
+        _update("PROCESSING", {"status": "Evaluating cleverness..."})
         cleverness_result = judge.evaluate_cleverness(
             verse.text,
             context=context,
@@ -70,7 +74,7 @@ def evaluate_verse_semantic(
 
         # Evaluate response potential
         logger.info("Evaluating response potential...")
-        self.update_state(state="PROCESSING", meta={"status": "Evaluating response..."})
+        _update("PROCESSING", {"status": "Evaluating response..."})
 
         # For response evaluation, we need opponent verse from context
         opponent_verse = ""
@@ -178,10 +182,14 @@ def calibrate_llm_scores(self, battles_count: int = 10) -> dict:
     Returns:
         Calibration metrics
     """
+    def _update(state, meta):
+        if self.request.id:
+            self.update_state(state=state, meta=meta)
+
     db = SessionLocal()
     try:
         logger.info("Starting LLM calibration against human judges")
-        self.update_state(state="PROCESSING", meta={"status": "Gathering annotations..."})
+        _update("PROCESSING", {"status": "Gathering annotations..."})
 
         from app.models.semantic import HumanJudgeAnnotation
         from scipy.stats import spearmanr

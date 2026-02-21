@@ -27,10 +27,14 @@ def separate_voices(self, battle_id: int, audio_path: str) -> dict:
     Returns:
         Dictionary with paths to separated sources
     """
+    def _update(state, meta):
+        if self.request.id:
+            self.update_state(state=state, meta=meta)
+
     db = SessionLocal()
     try:
-        logger.info(f"Task {self.request.id}: Starting voice separation for battle {battle_id}")
-        self.update_state(state='PROCESSING', meta={'status': 'Separating voices from background...'})
+        logger.info(f"Starting voice separation for battle {battle_id}")
+        _update('PROCESSING', {'status': 'Separating voices from background...'})
 
         # Verify file exists
         audio_file = Path(audio_path)
@@ -48,12 +52,12 @@ def separate_voices(self, battle_id: int, audio_path: str) -> dict:
 
         # Load Demucs model
         logger.info("Loading Demucs model...")
-        self.update_state(state='PROCESSING', meta={'status': 'Loading Demucs model...'})
+        _update('PROCESSING', {'status': 'Loading Demucs model...'})
         model = get_model("htdemucs").to(device)
 
         # Apply separation
         logger.info("Applying voice separation...")
-        self.update_state(state='PROCESSING', meta={'status': 'Separating sources...'})
+        _update('PROCESSING', {'status': 'Separating sources...'})
 
         # Ensure correct number of channels
         if waveform.dim() == 1:
@@ -93,11 +97,6 @@ def separate_voices(self, battle_id: int, audio_path: str) -> dict:
 
     except Exception as e:
         logger.error(f"Voice separation failed for battle {battle_id}: {str(e)}", exc_info=True)
-        battle = db.query(Battle).filter(Battle.id == battle_id).first()
-        if battle:
-            from app.models.battle import BattleStatus
-            battle.status = BattleStatus.FAILED
-            db.commit()
         raise
 
     finally:

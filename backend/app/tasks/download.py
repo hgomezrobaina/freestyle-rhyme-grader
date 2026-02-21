@@ -31,10 +31,14 @@ def download_youtube_video(self, battle_id: int, url: str) -> dict:
     Returns:
         Dictionary with audio file path and metadata
     """
+    def _update(state, meta):
+        if self.request.id:
+            self.update_state(state=state, meta=meta)
+
     db = SessionLocal()
     try:
-        logger.info(f"Task {self.request.id}: Starting download for battle {battle_id}")
-        self.update_state(state='PROCESSING', meta={'status': 'Downloading from YouTube...'})
+        logger.info(f"Starting download for battle {battle_id}")
+        _update('PROCESSING', {'status': 'Downloading from YouTube...'})
 
         # Update battle status
         battle = db.query(Battle).filter(Battle.id == battle_id).first()
@@ -94,10 +98,6 @@ def download_youtube_video(self, battle_id: int, url: str) -> dict:
 
     except Exception as e:
         logger.error(f"Download task failed for battle {battle_id}: {str(e)}", exc_info=True)
-        batch = db.query(Battle).filter(Battle.id == battle_id).first()
-        if battle:
-            battle.status = BattleStatus.FAILED
-            db.commit()
         raise
 
     finally:
@@ -118,8 +118,12 @@ def save_uploaded_file(self, battle_id: int, filename: str, file_content: bytes)
         Dictionary with saved file path
     """
     try:
+        def _update(state, meta):
+            if self.request.id:
+                self.update_state(state=state, meta=meta)
+
         logger.info(f"Saving uploaded file for battle {battle_id}: {filename}")
-        self.update_state(state='PROCESSING', meta={'status': 'Saving file...'})
+        _update('PROCESSING', {'status': 'Saving file...'})
 
         # Create directory
         output_dir = Path(settings.TEMP_DIR) / f"battle_{battle_id}"

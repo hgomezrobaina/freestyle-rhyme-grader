@@ -16,7 +16,9 @@ class BattleService:
         self.metrics_calculator = RhymeMetricsCalculator()
 
     def create_battle_from_text(
-        self, db: Session, battle_input: TextBattleInput
+        self, 
+        db: Session, 
+        battle_input: TextBattleInput
     ) -> Battle:
         """
         Create a battle from text input (already transcribed).

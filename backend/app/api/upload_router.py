@@ -2,7 +2,7 @@
 API routes for uploading battle audio/video files.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.schema import BattleResponse
@@ -31,8 +31,7 @@ async def create_battle_from_upload(
     file: UploadFile = File(...),
     title: str = None,
     description: str = None,
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None
+    db: Session = Depends(get_db)
 ):
     """
     Upload an audio or video file for battle processing.
@@ -103,17 +102,8 @@ async def create_battle_from_upload(
 
         logger.info(f"Saved uploaded file: {file_path}")
 
-        # Queue processing task
-        if background_tasks:
-            background_tasks.add_task(
-                process_pipeline,
-                battle.id,
-                "upload",
-                str(file_path)
-            )
-        else:
-            # Fallback: use Celery directly
-            process_pipeline.delay(battle.id, "upload", str(file_path))
+        # Queue processing task via Celery
+        process_pipeline.delay(battle.id, "upload", str(file_path))
 
         logger.info(f"Queued processing for battle {battle.id}")
 
@@ -164,6 +154,7 @@ async def get_upload_battle_status(battle_id: int, db: Session = Depends(get_db)
         "id": battle.id,
         "title": battle.title,
         "status": battle.status.value,
+        "progress_step": battle.progress_step.value if battle.progress_step else None,
         "progress_message": status_messages.get(battle.status, "Unknown status"),
         "verses_count": len(verses),
         "created_at": battle.created_at,

@@ -10,12 +10,26 @@ class BattleCreate(BaseModel):
     source_type: BattleSourceType
     source_url: Optional[str] = None
 
+class BattleParticipantResponse(BaseModel):
+    id: int
+    mc_name: str
+    team_number: int
+    position_in_team: int
+
+    class Config:
+        from_attributes = True
+
 class BattleResponse(BaseModel):
     id: int
     title: str
     description: Optional[str]
     source_type: BattleSourceType
+    source_url: Optional[str] = None
     status: BattleStatus
+    progress_step: Optional[str] = None
+    battle_date: Optional[str] = None
+    federation: Optional[str] = None
+    total_rounds: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -49,6 +63,7 @@ class VerseResponse(BaseModel):
     speaker: Optional[str]
     text: str
     duration_seconds: Optional[float]
+    round_number: Optional[int] = None
     rhyme_metric: Optional[RhymeMetricResponse]
     created_at: datetime
 
@@ -57,6 +72,7 @@ class VerseResponse(BaseModel):
 
 class BattleDetailResponse(BattleResponse):
     verses: List[VerseResponse] = []
+    participants: List[BattleParticipantResponse] = []
 
 # User Rating Schemas
 class UserRatingCreate(BaseModel):
