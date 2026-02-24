@@ -9,6 +9,11 @@ node_modules/
 .env*.local
 .DS_Store
 
+## files
+uploads/
+temp/
+logs/
+
 # Claude Code temporary files
 tmpclaude*
 .claude-*

@@ -9,7 +9,7 @@ import { ScoreBadge } from "@/components/score-badge"
 import { VideoPlayer, type VideoPlayerHandle } from "@/components/video-player"
 import { RhymePanel } from "@/components/rhyme-panel"
 import type { Battle } from "@/lib/types"
-import { getBattleAverageScore } from "@/lib/mock-data"
+import { getBattleAverageScore } from "@/lib/utils-battle"
 
 export function BattleView({ battle }: { battle: Battle }) {
   const playerRef = useRef<VideoPlayerHandle>(null)

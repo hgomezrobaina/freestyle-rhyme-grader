@@ -39,9 +39,9 @@ def transcribe_audio(self, battle_id: int, audio_path: str) -> dict:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         # Load Whisper model
-        logger.info("Loading Whisper model (large-v3)...")
+        logger.info("Loading Whisper model (medium)...")
         _update('PROCESSING', {'status': 'Loading Whisper model...'})
-        model = whisper.load_model("large-v3")
+        model = whisper.load_model("medium")
 
         # Transcribe
         logger.info(f"Transcribing: {audio_path}")

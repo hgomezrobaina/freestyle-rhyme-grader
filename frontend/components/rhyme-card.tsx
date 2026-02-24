@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { RatingSliders } from "@/components/rating-sliders"
 import { ScoreBadge } from "@/components/score-badge"
 import type { Rhyme, RhymeRating } from "@/lib/types"
-import { formatTimestamp, getAverageScore } from "@/lib/mock-data"
+import { formatTimestamp, getAverageScore } from "@/lib/utils-battle"
 import { cn } from "@/lib/utils"
 
 export function RhymeCard({

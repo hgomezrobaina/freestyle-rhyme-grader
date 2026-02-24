@@ -1,16 +1,37 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Mic2, Flame, Users, BarChart3 } from "lucide-react"
+import { Mic2, Flame, Users, BarChart3, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BattleCard } from "@/components/battle-card"
-import { battles } from "@/lib/mock-data"
-
-const stats = [
-  { icon: Flame, label: "Batallas", value: "3" },
-  { icon: BarChart3, label: "Rimas Calificadas", value: "24" },
-  { icon: Users, label: "MCs", value: "6" },
-]
+import { listBattles } from "@/lib/api"
+import { mapBattleResponseToBattle } from "@/lib/utils-battle"
+import type { Battle } from "@/lib/types"
 
 export default function HomePage() {
+  const [battles, setBattles] = useState<Battle[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    listBattles()
+      .then((responses) => {
+        setBattles(responses.map(mapBattleResponseToBattle))
+      })
+      .catch(() => {
+        setBattles([])
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
+
+  const stats = [
+    { icon: Flame, label: "Batallas", value: String(battles.length) },
+    { icon: BarChart3, label: "Rimas Calificadas", value: String(battles.reduce((acc, b) => acc + b.rhymes.length, 0)) },
+    { icon: Users, label: "MCs", value: String(battles.length * 2) },
+  ]
+
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -63,9 +84,22 @@ export default function HomePage() {
           </div>
         </div>
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {battles.map((battle, i) => (
-            <BattleCard key={battle.id} battle={battle} index={i} />
-          ))}
+          {loading ? (
+            <div className="col-span-full flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : battles.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center gap-3 py-12 text-center">
+              <p className="text-muted-foreground">No hay batallas todavia</p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/upload">Subir la primera batalla</Link>
+              </Button>
+            </div>
+          ) : (
+            battles.map((battle, i) => (
+              <BattleCard key={battle.id} battle={battle} index={i} />
+            ))
+          )}
         </div>
       </section>
     </div>

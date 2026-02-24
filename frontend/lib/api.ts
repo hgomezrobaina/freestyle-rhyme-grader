@@ -3,12 +3,24 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export type BattleSourceType = "youtube" | "upload" | "text";
 export type BattleStatus = "pending" | "processing" | "completed" | "failed";
 
+export interface BattleParticipantResponse {
+  id: number;
+  mc_name: string;
+  team_number: number;
+  position_in_team: number;
+}
+
 export interface BattleResponse {
   id: number;
   title: string;
   description?: string;
   source_type: BattleSourceType;
+  source_url?: string;
   status: BattleStatus;
+  progress_step?: string;
+  battle_date?: string;
+  federation?: string;
+  total_rounds?: number;
   created_at: string;
   updated_at: string;
 }
@@ -17,30 +29,35 @@ export interface BattleStatusResponse {
   id: number;
   title: string;
   status: BattleStatus;
+  progress_step?: string;
   progress_message?: string;
   verses_count: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface BattleDetailResponse extends BattleResponse {
-  verses: Array<{
+export interface VerseResponse {
+  id: number;
+  battle_id: number;
+  verse_number: number;
+  speaker?: string;
+  text: string;
+  duration_seconds?: number;
+  round_number?: number;
+  rhyme_metric?: {
     id: number;
-    battle_id: number;
-    verse_number: number;
-    speaker?: string;
-    text: string;
-    duration_seconds?: number;
-    rhyme_metric?: {
-      id: number;
-      rhyme_density: number;
-      multisyllabic_ratio: number;
-      internal_rhymes_count: number;
-      rhyme_diversity?: number;
-      total_syllables: number;
-      rhymed_syllables: number;
-    };
-  }>;
+    rhyme_density: number;
+    multisyllabic_ratio: number;
+    internal_rhymes_count: number;
+    rhyme_diversity?: number;
+    total_syllables: number;
+    rhymed_syllables: number;
+  };
+}
+
+export interface BattleDetailResponse extends BattleResponse {
+  verses: VerseResponse[];
+  participants: BattleParticipantResponse[];
 }
 
 export class ApiError extends Error {

@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScoreBadge } from "@/components/score-badge"
 import type { Battle } from "@/lib/types"
-import { getBattleAverageScore } from "@/lib/mock-data"
+import { getBattleAverageScore } from "@/lib/utils-battle"
 import { getYoutubeThumbnail } from "@/lib/youtube"
 
 const gradients = [
