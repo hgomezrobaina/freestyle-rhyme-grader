@@ -10,6 +10,11 @@ class BattleCreate(BaseModel):
     source_type: BattleSourceType
     source_url: Optional[str] = None
 
+class BattleParticipantCreate(BaseModel):
+    mc_name: str
+    team_number: int
+    position_in_team: int = 0
+
 class BattleParticipantResponse(BaseModel):
     id: int
     mc_name: str
@@ -19,6 +24,9 @@ class BattleParticipantResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class BattleParticipantRename(BaseModel):
+    mc_name: str
+
 class BattleResponse(BaseModel):
     id: int
     title: str
@@ -27,9 +35,11 @@ class BattleResponse(BaseModel):
     source_url: Optional[str] = None
     status: BattleStatus
     progress_step: Optional[str] = None
+    battle_format: Optional[str] = None
     battle_date: Optional[str] = None
     federation: Optional[str] = None
     total_rounds: Optional[int] = None
+    participants: List[BattleParticipantResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +71,7 @@ class VerseResponse(BaseModel):
     battle_id: int
     verse_number: int
     speaker: Optional[str]
+    participant_id: Optional[int] = None
     text: str
     duration_seconds: Optional[float]
     round_number: Optional[int] = None

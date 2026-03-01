@@ -77,6 +77,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       PYTHONPATH: /app
       PYTHONUNBUFFERED: "1"
+      HF_TOKEN: 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
     volumes:
       - ./app:/app/app
       - ./analysis:/app/analysis

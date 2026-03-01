@@ -3,6 +3,7 @@ Diarization task - handles speaker identification and segmentation using Pyannot
 """
 
 import logging
+import os
 from pathlib import Path
 from pyannote.audio import Pipeline
 import torch
@@ -47,21 +48,15 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
         logger.info("Loading Pyannote pipeline...")
         _update('PROCESSING', {'status': 'Loading speaker diarization model...'})
 
-        try:
-            pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.0",
-                use_auth_token=None  # Set your HF token if needed
-            )
-            pipeline = pipeline.to(device)
-        except Exception as e:
-            logger.warning(f"Could not load pyannote pipeline: {e}")
-            logger.info("Using simplified speaker detection")
-            return {
-                "battle_id": battle_id,
-                "segments": [],
-                "speakers": ["MC1", "MC2"],
-                "note": "Simplified detection - pyannote not available",
-            }
+        hf_token = os.getenv("HF_TOKEN")
+        if not hf_token:
+            raise RuntimeError("HF_TOKEN environment variable is not set. Required for pyannote diarization.")
+
+        pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.0",
+            use_auth_token=hf_token
+        )
+        pipeline = pipeline.to(device)
 
         # Apply diarization
         logger.info("Applying speaker diarization...")
@@ -85,23 +80,29 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
 
         logger.info(f"Found {len(segments)} segments from {len(speaker_set)} speakers")
 
-        # Identify MC1 and MC2 (first two speakers)
-        speakers = sorted(list(speaker_set))[:2]
+        # Map all detected speakers to MC labels (MC1, MC2, MC3, ...)
+        speakers = sorted(list(speaker_set))
         mc_mapping = {
-            speakers[0]: "MC1",
-            speakers[1]: "MC2" if len(speakers) > 1 else "MC1",
+            speaker: f"MC{i + 1}"
+            for i, speaker in enumerate(speakers)
         }
+
+        logger.info(f"Speaker mapping: {mc_mapping}")
 
         # Remap speakers
         for segment in segments:
-            segment["speaker"] = mc_mapping.get(segment["speaker"], segment["speaker"])
+            segment["speaker"] = mc_mapping.get(
+                segment["speaker"],
+                segment["speaker"]
+            )
 
-        logger.info(f"Diarization completed for battle {battle_id}")
+        mapped_speakers = [f"MC{i + 1}" for i in range(len(speakers))]
+        logger.info(f"Diarization completed for battle {battle_id}: {len(mapped_speakers)} speakers detected")
 
         return {
             "battle_id": battle_id,
             "segments": segments,
-            "speakers": list(set(segment["speaker"] for segment in segments)),
+            "speakers": mapped_speakers,
             "total_segments": len(segments),
         }
 

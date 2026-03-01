@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { RhymeCard } from "@/components/rhyme-card"
 import type { Battle } from "@/lib/types"
+import { getTeamLabel } from "@/lib/utils-battle"
 import { cn } from "@/lib/utils"
 
 type MCFilter = "all" | "mc1" | "mc2"
@@ -44,8 +45,8 @@ export function RhymePanel({
           {(
             [
               { key: "all", label: "Todos", count: battle.rhymes.length },
-              { key: "mc1", label: battle.mc1.name, count: mc1Count },
-              { key: "mc2", label: battle.mc2.name, count: mc2Count },
+              { key: "mc1", label: getTeamLabel(battle.participants, 0), count: mc1Count },
+              { key: "mc2", label: getTeamLabel(battle.participants, 1), count: mc2Count },
             ] as const
           ).map((filter) => (
             <button
@@ -95,8 +96,8 @@ export function RhymePanel({
                       <RhymeCard
                         key={rhyme.id}
                         rhyme={rhyme}
-                        mc1Name={battle.mc1.name}
-                        mc2Name={battle.mc2.name}
+                        mc1Name={getTeamLabel(battle.participants, 0)}
+                        mc2Name={getTeamLabel(battle.participants, 1)}
                         onTimestampClick={onTimestampClick}
                       />
                     ))

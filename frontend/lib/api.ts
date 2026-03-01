@@ -18,9 +18,11 @@ export interface BattleResponse {
   source_url?: string;
   status: BattleStatus;
   progress_step?: string;
+  battle_format?: string;
   battle_date?: string;
   federation?: string;
   total_rounds?: number;
+  participants: BattleParticipantResponse[];
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +43,7 @@ export interface VerseResponse {
   battle_id: number;
   verse_number: number;
   speaker?: string;
+  participant_id?: number;
   text: string;
   duration_seconds?: number;
   round_number?: number;
@@ -94,15 +97,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export async function uploadBattle(
   file: File,
   title: string,
-  mc1: string,
-  mc2: string,
   event?: string,
-  rounds?: number,
 ): Promise<BattleResponse> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("title", title);
-  formData.append("description", event || `${mc1} vs ${mc2}`);
+  formData.append("description", event || "");
 
   const response = await fetch(`${API_BASE_URL}/api/battles/upload/upload`, {
     method: "POST",
@@ -176,4 +176,24 @@ export async function listBattles(skip = 0, limit = 100) {
   const response = await fetch(`${API_BASE_URL}/api/battles/?${params}`);
 
   return handleResponse<BattleResponse[]>(response);
+}
+
+/**
+ * Renombrar un participante de una batalla
+ */
+export async function renameParticipant(
+  battleId: number,
+  participantId: number,
+  newName: string,
+): Promise<BattleParticipantResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/battles/${battleId}/participants/${participantId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mc_name: newName }),
+    },
+  );
+
+  return handleResponse<BattleParticipantResponse>(response);
 }

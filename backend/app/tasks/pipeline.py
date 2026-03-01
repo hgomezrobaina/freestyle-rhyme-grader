@@ -6,7 +6,8 @@ import logging
 from celery import chain, group
 from app.workers.celery_app import celery_app
 from app.database import SessionLocal
-from app.models.battle import Battle, BattleStatus, PipelineStep
+from app.models.battle import Battle, BattleStatus, BattleFormat, PipelineStep
+from app.models.mc_context import BattleParticipant
 from app.tasks.download import download_youtube_video
 from app.tasks.transcription import transcribe_audio
 from app.tasks.voice_separation import separate_voices
@@ -98,6 +99,51 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
 
         logger.info(f"Diarization complete: {speakers}")
 
+        # Step 4.5: Create BattleParticipant records from detected speakers
+        existing_participants = db.query(BattleParticipant).filter(
+            BattleParticipant.battle_id == battle_id
+        ).all()
+
+        speaker_to_participant = {}
+        if not existing_participants:
+            # Assign teams alternating: speaker 0→team0, 1→team1, 2→team0, 3→team1...
+            team_counters = {}  # track position_in_team per team
+            for i, speaker_label in enumerate(speakers):
+                team = i % 2
+                pos = team_counters.get(team, 0)
+                team_counters[team] = pos + 1
+                participant = BattleParticipant(
+                    battle_id=battle_id,
+                    mc_name=f"MC {i + 1}",
+                    team_number=team,
+                    position_in_team=pos,
+                )
+                db.add(participant)
+                db.flush()
+                speaker_to_participant[speaker_label] = participant.id
+                
+            db.commit()
+            logger.info(f"Created {len(speakers)} auto-detected participants for battle {battle_id}")
+        else:
+            # Map existing participants to speaker labels by team order
+            sorted_participants = sorted(existing_participants, key=lambda p: (p.team_number, p.position_in_team))
+            for i, speaker_label in enumerate(speakers):
+                if i < len(sorted_participants):
+                    speaker_to_participant[speaker_label] = sorted_participants[i].id
+            logger.info(f"Mapped {len(speaker_to_participant)} existing participants to speakers")
+
+        # Auto-detect battle_format if not set
+        battle = db.query(Battle).filter(Battle.id == battle_id).first()
+        if battle and not battle.battle_format:
+            num_speakers = len(speakers)
+            format_map = {
+                2: BattleFormat.ONE_VS_ONE,
+                4: BattleFormat.TWO_VS_TWO,
+                6: BattleFormat.THREE_VS_THREE,
+            }
+            battle.battle_format = format_map.get(num_speakers, BattleFormat.ONE_VS_ONE)
+            db.commit()
+
         # Step 5: Segment verses and analyze
         logger.info("Step 5: Verse segmentation and analysis")
         _set_step(PipelineStep.ANALYZE)
@@ -107,7 +153,8 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
             battle_id,
             full_text,
             segments,
-            speaker_segments
+            speaker_segments,
+            speaker_to_participant,
         )
 
         logger.info(f"Pipeline complete: {len(verses)} verses analyzed")
@@ -157,7 +204,8 @@ def segment_verses(
     battle_id: int,
     full_text: str,
     transcription_segments: list,
-    speaker_segments: list
+    speaker_segments: list,
+    speaker_to_participant: dict = None,
 ) -> list:
     """
     Segment transcribed text into individual verses based on speaker changes.
@@ -207,6 +255,7 @@ def segment_verses(
                     battle_id=battle_id,
                     verse_number=verse_number,
                     speaker=current_speaker,
+                    participant_id=speaker_to_participant.get(current_speaker) if speaker_to_participant else None,
                     text=current_text.strip(),
                     duration_seconds=seg["start_time"] - current_start,
                 )
@@ -244,6 +293,7 @@ def segment_verses(
                 battle_id=battle_id,
                 verse_number=verse_number,
                 speaker=current_speaker,
+                participant_id=speaker_to_participant.get(current_speaker) if speaker_to_participant else None,
                 text=current_text.strip(),
             )
             db.add(verse)

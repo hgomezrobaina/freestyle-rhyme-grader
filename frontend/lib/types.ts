@@ -9,6 +9,7 @@ export type Rhyme = {
   id: string
   text: string
   mc: "mc1" | "mc2"
+  participantId?: number
   timestamp: number
   round: number
   ratings: RhymeRating
@@ -20,11 +21,23 @@ export type MC = {
   avatar: string
 }
 
+export type Participant = {
+  id: number
+  name: string
+  avatar: string
+  teamNumber: number
+  positionInTeam: number
+}
+
+export type BattleFormat = "1v1" | "2v2" | "3v3" | "3v1" | "1v2" | "multi"
+
 export type Battle = {
   id: string
   title: string
   mc1: MC
   mc2: MC
+  participants: Participant[]
+  battleFormat: BattleFormat
   videoUrl: string
   youtubeUrl?: string
   thumbnail: string

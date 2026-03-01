@@ -19,10 +19,7 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null)
   const [youtubeUrl, setYoutubeUrl] = useState("")
   const [title, setTitle] = useState("")
-  const [mc1, setMc1] = useState("")
-  const [mc2, setMc2] = useState("")
   const [event, setEvent] = useState("")
-  const [rounds, setRounds] = useState("3")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const youtubeValid = youtubeUrl.length > 0 && isValidYoutubeUrl(youtubeUrl)
@@ -42,8 +39,8 @@ export default function UploadPage() {
       )
       return
     }
-    if (!title.trim() || !mc1.trim() || !mc2.trim()) {
-      toast.error("Completa los campos obligatorios")
+    if (!title.trim()) {
+      toast.error("Completa el titulo")
       return
     }
 
@@ -53,31 +50,25 @@ export default function UploadPage() {
       let battleId: number
 
       if (mode === "upload" && file) {
-        // Subir archivo
-        const response = await uploadBattle(file, title, mc1, mc2, event, parseInt(rounds))
+        const response = await uploadBattle(file, title, event)
         battleId = response.id
         toast.success("Batalla subida exitosamente", {
-          description: `${mc1} vs ${mc2} - procesando análisis`,
+          description: "Los MCs seran detectados automaticamente",
         })
       } else {
-        // Subir desde YouTube
         const response = await createBattleFromYouTube(youtubeUrl, title, event || undefined)
         battleId = response.id
-        toast.success("Batalla añadida desde YouTube", {
-          description: `${mc1} vs ${mc2} - procesando análisis`,
+        toast.success("Batalla anadida desde YouTube", {
+          description: "Los MCs seran detectados automaticamente",
         })
       }
 
-      // Limpiar formulario
+      // Clear form
       setFile(null)
       setYoutubeUrl("")
       setTitle("")
-      setMc1("")
-      setMc2("")
       setEvent("")
-      setRounds("3")
 
-      // Redirigir a la página de batalla con parámetro de carga
       router.push(`/battle/${battleId}?uploading=true`)
     } catch (error) {
       setIsSubmitting(false)
@@ -95,7 +86,6 @@ export default function UploadPage() {
 
   function handleModeSwitch(newMode: SourceMode) {
     setMode(newMode)
-    // Clear the other source when switching
     if (newMode === "upload") {
       setYoutubeUrl("")
     } else {
@@ -113,7 +103,7 @@ export default function UploadPage() {
           Subir Batalla
         </h1>
         <p className="mt-2 text-sm text-muted-foreground text-pretty">
-          Sube un video o pega un link de YouTube para que la comunidad califique las rimas.
+          Sube un video o pega un link de YouTube. Los MCs seran detectados automaticamente.
         </p>
       </div>
 
@@ -228,7 +218,7 @@ export default function UploadPage() {
               Detalles de la Batalla
             </CardTitle>
             <CardDescription>
-              Completa la informacion sobre el enfrentamiento
+              Los participantes seran detectados automaticamente por el sistema
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
@@ -242,76 +232,25 @@ export default function UploadPage() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="ej. Chuty vs Aczino"
+                placeholder="ej. Chuty vs Aczino - FMS Internacional 2024"
                 className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 required
               />
             </div>
 
-            {/* MCs */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="mc1" className="text-xs font-semibold uppercase tracking-wider text-mc1">
-                  MC 1 *
-                </label>
-                <input
-                  id="mc1"
-                  type="text"
-                  value={mc1}
-                  onChange={(e) => setMc1(e.target.value)}
-                  placeholder="Nombre del MC"
-                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-mc1 focus:outline-none focus:ring-1 focus:ring-mc1"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="mc2" className="text-xs font-semibold uppercase tracking-wider text-mc2">
-                  MC 2 *
-                </label>
-                <input
-                  id="mc2"
-                  type="text"
-                  value={mc2}
-                  onChange={(e) => setMc2(e.target.value)}
-                  placeholder="Nombre del MC"
-                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-mc2 focus:outline-none focus:ring-1 focus:ring-mc2"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Event + Rounds */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="event" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Evento
-                </label>
-                <input
-                  id="event"
-                  type="text"
-                  value={event}
-                  onChange={(e) => setEvent(e.target.value)}
-                  placeholder="ej. FMS Internacional"
-                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="rounds" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Rounds
-                </label>
-                <select
-                  id="rounds"
-                  value={rounds}
-                  onChange={(e) => setRounds(e.target.value)}
-                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? "round" : "rounds"}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Event */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="event" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Evento
+              </label>
+              <input
+                id="event"
+                type="text"
+                value={event}
+                onChange={(e) => setEvent(e.target.value)}
+                placeholder="ej. FMS Internacional"
+                className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
             </div>
           </CardContent>
         </Card>

@@ -74,7 +74,10 @@ class Verse(Base):
     id = Column(Integer, primary_key=True, index=True)
     battle_id = Column(Integer, ForeignKey("battles.id"), index=True)
     verse_number = Column(Integer)  # Order in the battle
-    speaker = Column(String, nullable=True)  # MC1, MC2, or name
+    speaker = Column(String, nullable=True)  # MC1, MC2, or name (raw diarization label)
+
+    # Link to battle participant who spoke this verse
+    participant_id = Column(Integer, ForeignKey("battle_participants.id"), nullable=True)
 
     # Fase 4: Link to MC profile for context
     mc_id = Column(Integer, ForeignKey("mc_profiles.id"), nullable=True)
@@ -86,6 +89,7 @@ class Verse(Base):
 
     # Relationships
     battle = relationship("Battle", back_populates="verses")
+    participant = relationship("BattleParticipant", foreign_keys=[participant_id])
     mc_profile = relationship("MCProfile", foreign_keys=[mc_id], back_populates="verses")
     rhyme_metric = relationship("RhymeMetric", back_populates="verse", uselist=False, cascade="all, delete-orphan")
     semantic_metric = relationship("SemanticMetric", back_populates="verse", uselist=False, cascade="all, delete-orphan")  # Fase 3

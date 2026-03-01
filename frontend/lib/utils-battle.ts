@@ -1,5 +1,5 @@
-import type { Battle, RhymeRating } from "./types"
-import type { BattleDetailResponse, BattleResponse } from "./api"
+import type { Battle, BattleFormat, Participant, RhymeRating } from "./types"
+import type { BattleDetailResponse, BattleParticipantResponse, BattleResponse } from "./api"
 
 export function getAverageScore(ratings: RhymeRating): number {
   return Number(((ratings.rima + ratings.ingenio + ratings.punchline + ratings.respuesta) / 4).toFixed(1))
@@ -17,26 +17,57 @@ export function formatTimestamp(seconds: number): string {
   return `${min}:${sec.toString().padStart(2, "0")}`
 }
 
+function mapParticipants(apiParticipants: BattleParticipantResponse[]): Participant[] {
+  return apiParticipants.map((p) => ({
+    id: p.id,
+    name: p.mc_name,
+    avatar: p.mc_name.charAt(0).toUpperCase(),
+    teamNumber: p.team_number,
+    positionInTeam: p.position_in_team,
+  }))
+}
+
+export function getTeamLabel(participants: Participant[], teamNumber: number): string {
+  const team = participants.filter((p) => p.teamNumber === teamNumber)
+  if (team.length === 0) return teamNumber === 0 ? "MC1" : "MC2"
+  return team.map((p) => p.name).join(" & ")
+}
+
 /**
  * Map API BattleDetailResponse to frontend Battle type
  */
 export function mapBattleDetailToBattle(detail: BattleDetailResponse): Battle {
-  // Extract MC names from participants or verse speakers
-  const team1 = detail.participants?.filter((p) => p.team_number === 0) ?? []
-  const team2 = detail.participants?.filter((p) => p.team_number === 1) ?? []
+  // Build participants from API data
+  const participants = mapParticipants(detail.participants ?? [])
+
+  const team1 = participants.filter((p) => p.teamNumber === 0)
+  const team2 = participants.filter((p) => p.teamNumber === 1)
 
   // Fallback: extract unique speakers from verses
   const speakers = [...new Set(detail.verses.map((v) => v.speaker).filter(Boolean))] as string[]
 
-  const mc1Name = team1[0]?.mc_name ?? speakers[0] ?? "MC1"
-  const mc2Name = team2[0]?.mc_name ?? speakers[1] ?? "MC2"
+  const mc1Name = team1[0]?.name ?? speakers[0] ?? "MC1"
+  const mc2Name = team2[0]?.name ?? speakers[1] ?? "MC2"
 
-  // Build a speaker -> mc mapping
+  // If no participants from API, create defaults
+  if (participants.length === 0) {
+    participants.push(
+      { id: 0, name: mc1Name, avatar: mc1Name.charAt(0).toUpperCase(), teamNumber: 0, positionInTeam: 0 },
+      { id: 0, name: mc2Name, avatar: mc2Name.charAt(0).toUpperCase(), teamNumber: 1, positionInTeam: 0 },
+    )
+  }
+
+  // Build participant_id -> mc mapping (primary source)
+  const participantToMc = new Map<number, "mc1" | "mc2">()
+  for (const p of participants) {
+    participantToMc.set(p.id, p.teamNumber === 0 ? "mc1" : "mc2")
+  }
+
+  // Fallback: speaker string -> mc mapping (for old data without participant_id)
   const speakerToMc = new Map<string, "mc1" | "mc2">()
   for (const verse of detail.verses) {
     if (!verse.speaker) continue
     if (!speakerToMc.has(verse.speaker)) {
-      // First unique speaker is mc1, second is mc2
       if (verse.speaker === mc1Name || speakerToMc.size === 0) {
         speakerToMc.set(verse.speaker, "mc1")
       } else {
@@ -50,10 +81,12 @@ export function mapBattleDetailToBattle(detail: BattleDetailResponse): Battle {
 
   // Map verses to rhymes
   const rhymes = detail.verses.map((verse) => {
-    const mc = speakerToMc.get(verse.speaker ?? "") ?? (verse.verse_number % 2 === 1 ? "mc1" : "mc2")
+    // Use participant_id as primary source, fallback to speaker string
+    const mc = verse.participant_id
+      ? (participantToMc.get(verse.participant_id) ?? "mc1")
+      : (speakerToMc.get(verse.speaker ?? "") ?? (verse.verse_number % 2 === 1 ? "mc1" : "mc2"))
     const metric = verse.rhyme_metric
 
-    // Convert rhyme metrics to ratings (scale 0-5)
     const ratings: RhymeRating = metric
       ? {
           rima: Math.min(5, metric.rhyme_density * 5),
@@ -67,6 +100,7 @@ export function mapBattleDetailToBattle(detail: BattleDetailResponse): Battle {
       id: String(verse.id),
       text: verse.text,
       mc: mc as "mc1" | "mc2",
+      participantId: verse.participant_id ?? undefined,
       timestamp: 0,
       round: verse.round_number ?? Math.ceil(verse.verse_number / 2),
       ratings,
@@ -78,6 +112,8 @@ export function mapBattleDetailToBattle(detail: BattleDetailResponse): Battle {
     title: detail.title,
     mc1: { name: mc1Name, avatar: mc1Name.charAt(0).toUpperCase() },
     mc2: { name: mc2Name, avatar: mc2Name.charAt(0).toUpperCase() },
+    participants,
+    battleFormat: (detail.battle_format as BattleFormat) ?? "1v1",
     videoUrl: "",
     youtubeUrl: detail.source_type === "youtube" ? detail.source_url ?? undefined : undefined,
     thumbnail: "",
@@ -92,11 +128,28 @@ export function mapBattleDetailToBattle(detail: BattleDetailResponse): Battle {
  * Map API BattleResponse (list item) to a minimal frontend Battle type
  */
 export function mapBattleResponseToBattle(response: BattleResponse): Battle {
+  const participants = mapParticipants(response.participants ?? [])
+
+  const team1 = participants.filter((p) => p.teamNumber === 0)
+  const team2 = participants.filter((p) => p.teamNumber === 1)
+
+  const mc1Name = team1[0]?.name ?? "MC1"
+  const mc2Name = team2[0]?.name ?? "MC2"
+
+  if (participants.length === 0) {
+    participants.push(
+      { id: 0, name: "MC1", avatar: "1", teamNumber: 0, positionInTeam: 0 },
+      { id: 0, name: "MC2", avatar: "2", teamNumber: 1, positionInTeam: 0 },
+    )
+  }
+
   return {
     id: String(response.id),
     title: response.title,
-    mc1: { name: "MC1", avatar: "1" },
-    mc2: { name: "MC2", avatar: "2" },
+    mc1: { name: mc1Name, avatar: mc1Name.charAt(0).toUpperCase() },
+    mc2: { name: mc2Name, avatar: mc2Name.charAt(0).toUpperCase() },
+    participants,
+    battleFormat: (response.battle_format as BattleFormat) ?? "1v1",
     videoUrl: "",
     youtubeUrl: response.source_type === "youtube" ? response.source_url ?? undefined : undefined,
     thumbnail: "",

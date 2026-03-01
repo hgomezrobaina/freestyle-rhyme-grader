@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScoreBadge } from "@/components/score-badge"
 import type { Battle } from "@/lib/types"
-import { getBattleAverageScore } from "@/lib/utils-battle"
+import { getBattleAverageScore, getTeamLabel } from "@/lib/utils-battle"
 import { getYoutubeThumbnail } from "@/lib/youtube"
 
 const gradients = [
@@ -33,18 +33,30 @@ export function BattleCard({ battle, index = 0 }: { battle: Battle; index?: numb
             </>
           )}
           <div className="relative flex items-center gap-4 text-foreground">
-            <div className="flex flex-col items-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mc1/20 text-2xl font-black text-mc1 ring-2 ring-mc1/30 backdrop-blur-sm">
-                {battle.mc1.avatar}
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex -space-x-2">
+                {battle.participants.filter((p) => p.teamNumber === 0).map((p, i) => (
+                  <div key={i} className="flex h-14 w-14 items-center justify-center rounded-full bg-mc1/20 text-2xl font-black text-mc1 ring-2 ring-mc1/30 backdrop-blur-sm">
+                    {p.avatar}
+                  </div>
+                ))}
               </div>
-              <span className="mt-1.5 text-xs font-bold uppercase drop-shadow-md">{battle.mc1.name}</span>
+              <span className="mt-1.5 text-xs font-bold uppercase drop-shadow-md">
+                {getTeamLabel(battle.participants, 0)}
+              </span>
             </div>
             <Swords className="h-6 w-6 text-muted-foreground drop-shadow-md" />
-            <div className="flex flex-col items-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mc2/20 text-2xl font-black text-mc2 ring-2 ring-mc2/30 backdrop-blur-sm">
-                {battle.mc2.avatar}
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex -space-x-2">
+                {battle.participants.filter((p) => p.teamNumber === 1).map((p, i) => (
+                  <div key={i} className="flex h-14 w-14 items-center justify-center rounded-full bg-mc2/20 text-2xl font-black text-mc2 ring-2 ring-mc2/30 backdrop-blur-sm">
+                    {p.avatar}
+                  </div>
+                ))}
               </div>
-              <span className="mt-1.5 text-xs font-bold uppercase drop-shadow-md">{battle.mc2.name}</span>
+              <span className="mt-1.5 text-xs font-bold uppercase drop-shadow-md">
+                {getTeamLabel(battle.participants, 1)}
+              </span>
             </div>
           </div>
           <div className="absolute right-3 top-3">

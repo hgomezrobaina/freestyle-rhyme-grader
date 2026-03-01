@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.schema import BattleResponse
-from app.models.battle import Battle, BattleSourceType, BattleStatus
+from app.models.battle import Battle, BattleSourceType, BattleStatus, BattleFormat
+from app.models.mc_context import BattleParticipant
 from app.services.battle_service import BattleService
 from app.tasks.pipeline import process_pipeline
 from app.config import get_settings
 from pathlib import Path
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,8 @@ async def create_battle_from_upload(
     file: UploadFile = File(...),
     title: str = None,
     description: str = None,
+    battle_format: str = "1v1",
+    participants_json: str = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -82,10 +86,25 @@ async def create_battle_from_upload(
             source_type=BattleSourceType.UPLOAD,
             source_url=filename,  # Store original filename
             status=BattleStatus.PROCESSING,
+            battle_format=BattleFormat(battle_format),
         )
         db.add(battle)
         db.commit()
         db.refresh(battle)
+
+        # Create participants
+        if participants_json:
+            participants = json.loads(participants_json)
+            for p in participants:
+                participant = BattleParticipant(
+                    battle_id=battle.id,
+                    mc_name=p["mc_name"],
+                    team_number=p["team_number"],
+                    position_in_team=p.get("position_in_team", 0),
+                )
+                db.add(participant)
+            db.commit()
+            db.refresh(battle)
 
         logger.info(f"Created battle {battle.id} from upload: {filename}")
 

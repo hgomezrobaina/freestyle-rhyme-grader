@@ -130,3 +130,4 @@ class BattleParticipant(Base):
     # Relationships
     battle = relationship("Battle", back_populates="participants")
     mc = relationship("MCProfile")
+    verses = relationship("Verse", foreign_keys="Verse.participant_id", back_populates="participant")
