@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button"
 import { ScoreBadge } from "@/components/score-badge"
 import { VideoPlayer, type VideoPlayerHandle } from "@/components/video-player"
 import { RhymePanel } from "@/components/rhyme-panel"
-import type { Battle, Participant } from "@/lib/types"
+import type { Battle } from "@/lib/types/battle"
+import type { Participant } from "@/lib/types/participant"
 import { getBattleAverageScore, getTeamLabel } from "@/lib/utils-battle"
-import { renameParticipant } from "@/lib/api"
+import { renameParticipant } from "@/lib/api/participants"
 
 export function BattleView({ battle }: { battle: Battle }) {
   const playerRef = useRef<VideoPlayerHandle>(null)

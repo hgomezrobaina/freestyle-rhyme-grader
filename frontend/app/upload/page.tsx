@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { UploadDropzone } from "@/components/upload-dropzone"
 import { isValidYoutubeUrl, getYoutubeThumbnail, extractYoutubeId } from "@/lib/youtube"
-import { uploadBattle, createBattleFromYouTube, ApiError } from "@/lib/api"
+import { uploadBattle, createBattleFromYouTube } from "@/lib/api/battles"
+import { ApiError } from "@/lib/api/base"
 
 type SourceMode = "upload" | "youtube"
 

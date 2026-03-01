@@ -1,6 +1,6 @@
 "use client"
 
-import { RATING_CATEGORIES, type RhymeRating } from "@/lib/types"
+import { RATING_CATEGORIES, type RhymeRating } from "@/lib/types/rating"
 import { cn } from "@/lib/utils"
 
 const cssVars: Record<string, string> = {

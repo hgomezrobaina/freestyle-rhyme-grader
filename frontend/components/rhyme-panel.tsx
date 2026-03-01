@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { RhymeCard } from "@/components/rhyme-card"
-import type { Battle } from "@/lib/types"
+import type { Battle } from "@/lib/types/battle"
 import { getTeamLabel } from "@/lib/utils-battle"
 import { cn } from "@/lib/utils"
 

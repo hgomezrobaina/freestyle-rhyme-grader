@@ -2,7 +2,7 @@
 
 import { useRef, useImperativeHandle, forwardRef, useState, useCallback } from "react"
 import { Play, Volume2, VolumeX, Maximize } from "lucide-react"
-import type { Battle } from "@/lib/types"
+import type { Battle } from "@/lib/types/battle"
 import { getYoutubeEmbedUrl } from "@/lib/youtube"
 
 export type VideoPlayerHandle = {

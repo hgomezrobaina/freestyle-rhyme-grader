@@ -5,9 +5,9 @@ import Link from "next/link"
 import { Mic2, Flame, Users, BarChart3, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BattleCard } from "@/components/battle-card"
-import { listBattles } from "@/lib/api"
+import { listBattles } from "@/lib/api/battles"
 import { mapBattleResponseToBattle } from "@/lib/utils-battle"
-import type { Battle } from "@/lib/types"
+import type { Battle } from "@/lib/types/battle"
 
 export default function HomePage() {
   const [battles, setBattles] = useState<Battle[]>([])

@@ -3,7 +3,7 @@ import { Calendar, MapPin, Swords } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScoreBadge } from "@/components/score-badge"
-import type { Battle } from "@/lib/types"
+import type { Battle } from "@/lib/types/battle"
 import { getBattleAverageScore, getTeamLabel } from "@/lib/utils-battle"
 import { getYoutubeThumbnail } from "@/lib/youtube"
 

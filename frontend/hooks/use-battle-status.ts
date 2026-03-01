@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  getBattleStatus,
-  BattleSourceType,
-  BattleStatus,
-  ApiError,
-} from "@/lib/api";
+import { getBattleStatus } from "@/lib/api/battles";
+import { ApiError } from "@/lib/api/base";
+import type { BattleSourceType, BattleStatus } from "@/lib/api/types";
 
 export interface BattleStatusData {
   id: number;

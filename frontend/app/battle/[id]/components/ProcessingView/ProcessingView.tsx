@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { getBattleDetail } from "@/lib/api";
+import { getBattleDetail } from "@/lib/api/battles";
 import { CheckCircle2, Loader2, Mic2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
