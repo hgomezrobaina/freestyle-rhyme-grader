@@ -121,7 +121,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
                 db.add(participant)
                 db.flush()
                 speaker_to_participant[speaker_label] = participant.id
-                
+
             db.commit()
             logger.info(f"Created {len(speakers)} auto-detected participants for battle {battle_id}")
         else:
@@ -147,6 +147,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         # Step 5: Segment verses and analyze
         logger.info("Step 5: Verse segmentation and analysis")
         _set_step(PipelineStep.ANALYZE)
+        
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 5/5: Analyzing verses...'})
 
         verses = segment_verses(
