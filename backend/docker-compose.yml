@@ -41,15 +41,8 @@ services:
     container_name: freestyle_backend
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://freestyle_user:freestyle_password@postgres:5432/freestyle_callificator
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-      SQLALCHEMY_ECHO: "False"
-      DEBUG: "False"
-      PYTHONPATH: /app
-      PYTHONUNBUFFERED: "1"
+    env_file:
+      - .env.docker
     volumes:
       - ./app:/app/app
       - ./analysis:/app/analysis
@@ -70,14 +63,8 @@ services:
       dockerfile: Dockerfile
     container_name: freestyle_celery_worker
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
-    environment:
-      DATABASE_URL: postgresql://freestyle_user:freestyle_password@postgres:5432/freestyle_callificator
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-      PYTHONPATH: /app
-      PYTHONUNBUFFERED: "1"
-      HF_TOKEN: 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
+    env_file:
+      - .env.docker
     volumes:
       - ./app:/app/app
       - ./analysis:/app/analysis
