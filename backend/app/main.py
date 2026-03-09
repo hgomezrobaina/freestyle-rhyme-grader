@@ -10,7 +10,8 @@ from app.database import Base, engine
 from app.api import battles_router, verses_router, ratings_router, youtube_router, upload_router, semantic_router, mc_context_router
 
 
-# Create tables
+# Reset database on startup (drop all tables and recreate)
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 # Initialize FastAPI app

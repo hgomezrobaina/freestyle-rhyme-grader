@@ -52,17 +52,23 @@ def diarize_speakers(self, battle_id: int, audio_path: str) -> dict:
         if not hf_token:
             raise RuntimeError("HF_TOKEN environment variable is not set. Required for pyannote diarization.")
 
+        import time
+        t0 = time.time()
         pipeline = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.0",
-            use_auth_token=hf_token
+            token=hf_token
         )
+        logger.info(f"Pyannote model loaded in {time.time() - t0:.1f}s")
+
         pipeline = pipeline.to(device)
 
         # Apply diarization
-        logger.info("Applying speaker diarization...")
-        _update('PROCESSING', {'status': 'Processing audio...'})
+        logger.info("Applying speaker diarization (this may take a while on CPU)...")
+        _update('PROCESSING', {'status': 'Processing audio (this may take several minutes)...'})
 
+        t1 = time.time()
         diarization = pipeline(audio_path)
+        logger.info(f"Diarization completed in {time.time() - t1:.1f}s")
 
         # Extract speaker segments
         segments = []
