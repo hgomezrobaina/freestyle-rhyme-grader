@@ -16,6 +16,7 @@ export default function BattlePage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const isUploading = searchParams.get("uploading") === "true";
+
   const [battle, setBattle] = useState<Battle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ export default function BattlePage() {
     if (isNaN(battleId)) {
       setError("ID de batalla invalido");
       setLoading(false);
+
       return;
     }
 
@@ -86,7 +88,7 @@ export default function BattlePage() {
       } catch {
         // keep polling
       }
-    }, 3000);
+    }, 5000);
 
     return () => {
       mounted = false;

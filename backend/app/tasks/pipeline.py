@@ -9,7 +9,6 @@ from app.database import SessionLocal
 from app.models.battle import Battle, BattleStatus, BattleFormat, PipelineStep
 from app.models.mc_context import BattleParticipant
 from app.tasks.download import download_youtube_video
-from app.tasks.transcription import transcribe_audio
 from app.tasks.voice_separation import separate_voices
 from app.tasks.diarization import diarize_speakers
 from analysis.rhyme.metrics import RhymeMetricsCalculator
@@ -65,36 +64,26 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
 
         logger.info(f"Audio ready: {audio_path}")
 
-        # Step 2: Transcribe
-        logger.info("Step 2: Transcription")
-        _set_step(PipelineStep.TRANSCRIBE)
-        self.update_state(state='PROCESSING', meta={'current_step': 'Step 2/5: Transcribing audio...'})
-
-        transcription_result = transcribe_audio(battle_id, audio_path)
-        full_text = transcription_result["full_text"]
-        segments = transcription_result["segments"]
-
-        logger.info(f"Transcription complete: {len(segments)} segments")
-
-        # Step 3: Voice separation (optional, for now skip if it fails)
-        logger.info("Step 3: Voice separation")
+        # Step 2: Voice separation (optional)
+        logger.info("Step 2: Voice separation")
         _set_step(PipelineStep.SEPARATE)
-        self.update_state(state='PROCESSING', meta={'current_step': 'Step 3/5: Separating voices...'})
+        self.update_state(state='PROCESSING', meta={'current_step': 'Step 2/4: Separating voices...'})
 
         try:
-            separation_result = separate_voices(battle_id, audio_path)
+            separate_voices(battle_id, audio_path)
             logger.info("Voice separation successful")
         except Exception as e:
             logger.warning(f"Voice separation failed (non-critical): {e}")
-            separation_result = {}
 
-        # Step 4: Diarization
-        logger.info("Step 4: Speaker diarization")
+        # Step 3: Transcription + Diarization (combined via WhisperX)
+        logger.info("Step 3: Transcription + Speaker diarization")
         _set_step(PipelineStep.DIARIZE)
-        self.update_state(state='PROCESSING', meta={'current_step': 'Step 4/5: Identifying speakers...'})
+        self.update_state(state='PROCESSING', meta={'current_step': 'Step 3/4: Transcribing and identifying speakers...'})
 
         diarization_result = diarize_speakers(battle_id, audio_path)
-        speaker_segments = diarization_result.get("segments", [])
+        full_text = diarization_result.get("full_text", "")
+        segments = diarization_result.get("segments", [])
+        speaker_segments = segments
         speakers = diarization_result.get("speakers", ["MC1", "MC2"])
 
         logger.info(f"Diarization complete: {speakers}")
@@ -123,6 +112,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
                 speaker_to_participant[speaker_label] = participant.id
 
             db.commit()
+            
             logger.info(f"Created {len(speakers)} auto-detected participants for battle {battle_id}")
         else:
             # Map existing participants to speaker labels by team order
@@ -130,6 +120,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
             for i, speaker_label in enumerate(speakers):
                 if i < len(sorted_participants):
                     speaker_to_participant[speaker_label] = sorted_participants[i].id
+            
             logger.info(f"Mapped {len(speaker_to_participant)} existing participants to speakers")
 
         # Auto-detect battle_format if not set
@@ -266,13 +257,13 @@ def segment_verses(
                 # Save metrics
                 rhyme_metric = RhymeMetric(
                     verse_id=verse.id,
-                    rhyme_density=metrics["rhyme_density"],
-                    multisyllabic_ratio=metrics["multisyllabic_ratio"],
-                    internal_rhymes_count=metrics["internal_rhymes_count"],
-                    rhyme_diversity=metrics["rhyme_diversity"],
-                    total_syllables=metrics["total_syllables"],
-                    rhymed_syllables=metrics["rhymed_syllables"],
-                    rhyme_types=metrics["rhyme_types"],
+                    rhyme_density=metrics.rhyme_density,
+                    multisyllabic_ratio=metrics.multisyllabic_ratio,
+                    internal_rhymes_count=metrics.internal_rhymes_count,
+                    rhyme_diversity=metrics.rhyme_diversity,
+                    total_syllables=metrics.total_syllables,
+                    rhymed_syllables=metrics.rhymed_syllables,
+                    rhyme_types=metrics.rhyme_types,
                 )
                 db.add(rhyme_metric)
 
@@ -302,13 +293,13 @@ def segment_verses(
 
             rhyme_metric = RhymeMetric(
                 verse_id=verse.id,
-                rhyme_density=metrics["rhyme_density"],
-                multisyllabic_ratio=metrics["multisyllabic_ratio"],
-                internal_rhymes_count=metrics["internal_rhymes_count"],
-                rhyme_diversity=metrics["rhyme_diversity"],
-                total_syllables=metrics["total_syllables"],
-                rhymed_syllables=metrics["rhymed_syllables"],
-                rhyme_types=metrics["rhyme_types"],
+                rhyme_density=metrics.rhyme_density,
+                multisyllabic_ratio=metrics.multisyllabic_ratio,
+                internal_rhymes_count=metrics.internal_rhymes_count,
+                rhyme_diversity=metrics.rhyme_diversity,
+                total_syllables=metrics.total_syllables,
+                rhymed_syllables=metrics.rhymed_syllables,
+                rhyme_types=metrics.rhyme_types,
             )
             db.add(rhyme_metric)
 

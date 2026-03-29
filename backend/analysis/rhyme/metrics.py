@@ -5,7 +5,7 @@ Metrics calculation for rhyme analysis.
 from typing import Dict
 from analysis.rhyme.detector import SpanishRhymeDetector
 from analysis.phonetic.syllable_counter import SpanishSyllableCounter
-
+from analysis.rhyme.domain.core.metric_calculator_result import MetricCalculatorResult 
 
 class RhymeMetricsCalculator:
     """Calculate comprehensive rhyme metrics for a verse."""
@@ -31,8 +31,8 @@ class RhymeMetricsCalculator:
         total_syllables = self.syllable_counter.count_syllables_in_text(text)
 
         # Basic metrics
-        total_words = analysis["total_words"]
-        rhyming_words = analysis["rhyming_words"]
+        total_words = analysis.total_words
+        rhyming_words = analysis.rhyming_words
 
         # Rhyme density: approximate based on rhyming words
         # More accurate calculation would track syllable-level rhymes
@@ -41,7 +41,7 @@ class RhymeMetricsCalculator:
         )
 
         # Count rhyme types
-        rhyme_types = analysis["rhyme_type_counts"]
+        rhyme_types = analysis.rhyme_type_counts
 
         # Multisyllabic ratio (simplified: count pairs with 2+ syllables)
         total_rhymes = sum(
@@ -58,15 +58,14 @@ class RhymeMetricsCalculator:
         # Rhyme diversity: how many different rhyme types used
         rhyme_diversity = len([v for v in rhyme_types.values() if v > 0]) / 5.0
 
-        return {
-            "rhyme_density": round(rhyme_density, 3),
-            "multisyllabic_ratio": round(multisyllabic_ratio, 3),
-            "internal_rhymes_count": internal_rhymes_count,
-            "rhyme_diversity": round(rhyme_diversity, 3),
-            "total_syllables": total_syllables,
-            "rhymed_syllables": int(total_syllables * rhyme_density),
-            "rhyme_types": rhyme_types,
-        }
+        return MetricCalculatorResult(
+            rhyme_density=rhyme_density,
+            multisyllabic_ratio=multisyllabic_ratio,
+            internal_rhymes_count=internal_rhymes_count,
+            rhyme_diversity=rhyme_diversity,
+            total_syllables=total_syllables,
+            rhyme_types=rhyme_types,
+        )
 
     def get_descriptive_analysis(self, metrics: Dict) -> str:
         """

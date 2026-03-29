@@ -7,8 +7,8 @@ redis
 pydantic
 pydantic-settings
 python-multipart
-openai-whisper
 demucs
+openai-whisper
 pyannote.audio
 phonemizer
 librosa

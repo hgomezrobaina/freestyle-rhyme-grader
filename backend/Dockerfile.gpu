@@ -25,6 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng-dev \
     zlib1g-dev \
     ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswresample-dev \
+    espeak-ng \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

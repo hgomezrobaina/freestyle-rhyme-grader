@@ -7,6 +7,7 @@ from typing import List, Dict, Tuple, Set
 from analysis.phonetic.transcriptor import SpanishPhoneticTranscriptor
 from analysis.phonetic.vowel_extractor import VowelExtractor
 from analysis.rhyme.types import RhymeType, RhymePattern
+from analysis.rhyme.domain.core.analyze_verse_result import AnalyzeVerseResult
 
 
 class SpanishRhymeDetector:
@@ -15,8 +16,10 @@ class SpanishRhymeDetector:
     def __init__(self):
         self.transcriptor = SpanishPhoneticTranscriptor()
         self.vowel_extractor = VowelExtractor()
+
         # Minimum similarity score for a consonant rhyme (0.0 to 1.0)
         self.consonant_threshold = 0.8
+        
         # Minimum similarity for assonant rhyme
         self.assonant_threshold = 0.6
 
@@ -24,6 +27,7 @@ class SpanishRhymeDetector:
         """Extract words from text, removing punctuation."""
         # Match Spanish words (including accented characters)
         words = re.findall(r"\b[a-záéíóúñ]+\b", text.lower())
+
         return words
 
     def _get_final_syllable_ipa(self, word: str) -> str:
@@ -148,7 +152,7 @@ class SpanishRhymeDetector:
 
         return rhyme_pairs
 
-    def analyze_verse(self, text: str) -> Dict:
+    def analyze_verse(self, text: str) -> AnalyzeVerseResult:
         """
         Analyze a verse for rhyme patterns.
 
@@ -173,10 +177,10 @@ class SpanishRhymeDetector:
                     rhyme_type_counts.get(rhyme_type, 0) + 1
                 )
 
-        return {
-            "words": words,
-            "total_words": total_words,
-            "rhyming_words": total_rhyming_words,
-            "rhyme_pairs": rhyme_pairs,
-            "rhyme_type_counts": rhyme_type_counts,
-        }
+        return AnalyzeVerseResult(
+            words=words,
+            total_words=total_words,
+            rhyme_pairs=rhyme_pairs,
+            rhyme_type_counts=rhyme_type_counts,
+            total_rhyming_words=total_rhyming_words
+        )
