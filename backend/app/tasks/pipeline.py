@@ -3,7 +3,7 @@ Pipeline orchestration - coordinates the full processing pipeline.
 """
 
 import logging
-from celery import chain, group
+import time
 from app.workers.celery_app import celery_app
 from app.database import SessionLocal
 from app.models.battle import Battle, BattleStatus, BattleFormat, PipelineStep
@@ -11,7 +11,6 @@ from app.models.mc_context import BattleParticipant
 from app.tasks.download import download_youtube_video
 from app.tasks.voice_separation import separate_voices
 from app.tasks.diarization import diarize_speakers
-from analysis.rhyme.metrics import RhymeMetricsCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +18,8 @@ logger = logging.getLogger(__name__)
 @celery_app.task(bind=True, name="tasks.process_pipeline")
 def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -> dict:
     """
-    Orchestrate the complete processing pipeline:
-    1. Download/Save audio
-    2. Transcribe with Whisper
-    3. Separate voices with Demucs
-    4. Diarize speakers with Pyannote
-    5. Segment and analyze verses
-    6. Calculate rhyme metrics
+    Upload pipeline: download, separate voices, and identify MCs.
+    Analysis (verse segmentation + rhyme metrics) is triggered separately.
 
     Args:
         battle_id: ID of the battle
@@ -33,7 +27,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         source_path: URL or file path
 
     Returns:
-        Dictionary with final results
+        Dictionary with diarization results
     """
     db = SessionLocal()
 
@@ -81,9 +75,7 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         self.update_state(state='PROCESSING', meta={'current_step': 'Step 3/4: Transcribing and identifying speakers...'})
 
         diarization_result = diarize_speakers(battle_id, audio_path)
-        full_text = diarization_result.get("full_text", "")
         segments = diarization_result.get("segments", [])
-        speaker_segments = segments
         speakers = diarization_result.get("speakers", ["MC1", "MC2"])
 
         logger.info(f"Diarization complete: {speakers}")
@@ -135,38 +127,33 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
             battle.battle_format = format_map.get(num_speakers, BattleFormat.ONE_VS_ONE)
             db.commit()
 
-        # Step 5: Segment verses and analyze
-        logger.info("Step 5: Verse segmentation and analysis")
+        # Step 4: Segment verses (without rhyme metrics)
+        logger.info("Step 4: Verse segmentation")
         _set_step(PipelineStep.ANALYZE)
-        
-        self.update_state(state='PROCESSING', meta={'current_step': 'Step 5/5: Analyzing verses...'})
+        self.update_state(state='PROCESSING', meta={'current_step': 'Step 4/4: Segmenting verses...'})
 
+        full_text = diarization_result.get("full_text", "")
         verses = segment_verses(
-            battle_id,
-            full_text,
-            segments,
-            speaker_segments,
-            speaker_to_participant,
+            battle_id, full_text, segments, segments, speaker_to_participant,
         )
 
-        logger.info(f"Pipeline complete: {len(verses)} verses analyzed")
+        logger.info(f"Pipeline complete: {len(verses)} verses segmented")
 
-        # Update battle status
+        # Mark as DIARIZED — rhyme analysis is triggered separately
         battle = db.query(Battle).filter(Battle.id == battle_id).first()
         if battle:
-            battle.status = BattleStatus.COMPLETED
+            battle.status = BattleStatus.DIARIZED
             battle.progress_step = None
             db.commit()
 
         result = {
             "battle_id": battle_id,
-            "verses_count": len(verses),
             "speakers": speakers,
-            "transcription_confidence": "medium", # From Whisper detect_language
-            "status": "completed",
+            "verses_count": len(verses),
+            "status": "diarized",
         }
 
-        logger.info(f"Pipeline completed successfully for battle {battle_id}")
+        logger.info(f"Upload pipeline completed for battle {battle_id}")
 
         return result
 
@@ -192,104 +179,42 @@ def process_pipeline(self, battle_id: int, source_type: str, source_path: str) -
         db.close()
 
 
-def segment_verses(
-    battle_id: int,
-    full_text: str,
-    transcription_segments: list,
-    speaker_segments: list,
-    speaker_to_participant: dict = None,
-) -> list:
+@celery_app.task(bind=True, name="tasks.analyze_battle")
+def analyze_battle(self, battle_id: int) -> dict:
     """
-    Segment transcribed text into individual verses based on speaker changes.
-
-    Args:
-        battle_id: ID of the battle
-        full_text: Full transcription text
-        transcription_segments: Time-aligned transcription segments
-        speaker_segments: Speaker diarization segments
-
-    Returns:
-        List of verse dictionaries with timing and speaker info
+    Calculate rhyme metrics for existing verses of a diarized battle.
     """
+    from app.models.battle import Verse, RhymeMetric
+    from analysis.rhyme.metrics import RhymeMetricsCalculator
+
     db = SessionLocal()
     try:
-        verses = []
-        verse_number = 1
-        current_speaker = None
-        current_text = ""
-        current_start = 0
+        battle = db.query(Battle).filter(Battle.id == battle_id).first()
+        if not battle:
+            raise ValueError(f"Battle {battle_id} not found")
+
+        if battle.status not in (BattleStatus.DIARIZED, BattleStatus.FAILED):
+            raise ValueError(f"Battle {battle_id} is not ready for analysis (status={battle.status})")
+
+        battle.status = BattleStatus.PROCESSING
+        battle.progress_step = PipelineStep.ANALYZE
+        db.commit()
+
+        verses = db.query(Verse).filter(Verse.battle_id == battle_id).order_by(Verse.verse_number).all()
+        if not verses:
+            raise ValueError(f"Battle {battle_id} has no verses to analyze")
 
         metrics_calculator = RhymeMetricsCalculator()
+        logger.info(f"Analyzing {len(verses)} verses for battle {battle_id}")
+        self.update_state(state='PROCESSING', meta={'current_step': 'Analyzing rhymes...'})
 
-        # Simple approach: split by speaker changes
-        for seg in speaker_segments:
-            speaker = seg["speaker"]
-            text = seg.get("text", "")
+        for i, verse in enumerate(verses):
+            # Skip if already has metrics
+            if verse.rhyme_metric:
+                continue
 
-            # If speaker changed, save previous verse
-            if speaker != current_speaker and current_text:
-                # Create verse
-                verse_data = {
-                    "verse_number": verse_number,
-                    "speaker": current_speaker or "MC1",
-                    "text": current_text.strip(),
-                    "start_time": current_start,
-                    "end_time": seg["start_time"],
-                }
-
-                # Analyze rhymes
-                metrics = metrics_calculator.calculate_metrics(verse_data["text"])
-
-                # Save to database
-                from app.models.battle import Verse, RhymeMetric
-
-                verse = Verse(
-                    battle_id=battle_id,
-                    verse_number=verse_number,
-                    speaker=current_speaker,
-                    participant_id=speaker_to_participant.get(current_speaker) if speaker_to_participant else None,
-                    text=current_text.strip(),
-                    duration_seconds=seg["start_time"] - current_start,
-                )
-                db.add(verse)
-                db.flush()
-
-                # Save metrics
-                rhyme_metric = RhymeMetric(
-                    verse_id=verse.id,
-                    rhyme_density=metrics.rhyme_density,
-                    multisyllabic_ratio=metrics.multisyllabic_ratio,
-                    internal_rhymes_count=metrics.internal_rhymes_count,
-                    rhyme_diversity=metrics.rhyme_diversity,
-                    total_syllables=metrics.total_syllables,
-                    rhymed_syllables=metrics.rhymed_syllables,
-                    rhyme_types=metrics.rhyme_types,
-                )
-                db.add(rhyme_metric)
-
-                verses.append(verse_data)
-                verse_number += 1
-                current_text = ""
-
-            current_speaker = speaker
-            current_text += " " + text if current_text else text
-            current_start = seg["start_time"]
-
-        # Save last verse
-        if current_text:
-            metrics = metrics_calculator.calculate_metrics(current_text.strip())
-
-            from app.models.battle import Verse, RhymeMetric
-
-            verse = Verse(
-                battle_id=battle_id,
-                verse_number=verse_number,
-                speaker=current_speaker,
-                participant_id=speaker_to_participant.get(current_speaker) if speaker_to_participant else None,
-                text=current_text.strip(),
-            )
-            db.add(verse)
-            db.flush()
+            logger.info(f"[Analyze] Verse {i+1}/{len(verses)} (id={verse.id})")
+            metrics = metrics_calculator.calculate_metrics(verse.text)
 
             rhyme_metric = RhymeMetric(
                 verse_id=verse.id,
@@ -303,6 +228,107 @@ def segment_verses(
             )
             db.add(rhyme_metric)
 
+        db.commit()
+
+        battle.status = BattleStatus.COMPLETED
+        battle.progress_step = None
+        db.commit()
+
+        logger.info(f"Analysis complete for battle {battle_id}: {len(verses)} verses")
+        return {
+            "battle_id": battle_id,
+            "verses_count": len(verses),
+            "status": "completed",
+        }
+
+    except Exception as e:
+        logger.error(f"Analysis failed for battle {battle_id}: {str(e)}", exc_info=True)
+        fail_db = SessionLocal()
+        try:
+            b = fail_db.query(Battle).filter(Battle.id == battle_id).first()
+            if b:
+                b.status = BattleStatus.FAILED
+                b.progress_step = PipelineStep.ANALYZE
+                fail_db.commit()
+        except Exception as db_err:
+            logger.error(f"Could not mark battle {battle_id} as FAILED: {db_err}")
+            fail_db.rollback()
+        finally:
+            fail_db.close()
+        raise
+
+    finally:
+        db.close()
+
+
+def segment_verses(
+    battle_id: int,
+    full_text: str,
+    transcription_segments: list,
+    speaker_segments: list,
+    speaker_to_participant: dict = None,
+) -> list:
+    """
+    Segment transcribed text into individual verses based on speaker changes.
+    Only creates Verse records — rhyme metrics are calculated separately.
+    """
+    from app.models.battle import Verse
+
+    db = SessionLocal()
+    try:
+        verses = []
+        verse_number = 1
+        current_speaker = None
+        current_text = ""
+        current_start = 0
+
+        t_start = time.time()
+        total_segments = len(speaker_segments)
+        logger.info(f"[SegmentVerses] Starting: {total_segments} speaker segments")
+
+        for seg_idx, seg in enumerate(speaker_segments):
+            if (seg_idx + 1) % 20 == 0:
+                logger.info(f"[SegmentVerses] Segment {seg_idx+1}/{total_segments}")
+
+            speaker = seg["speaker"]
+            text = seg.get("text", "")
+
+            if speaker != current_speaker and current_text:
+                verse = Verse(
+                    battle_id=battle_id,
+                    verse_number=verse_number,
+                    speaker=current_speaker,
+                    participant_id=speaker_to_participant.get(current_speaker) if speaker_to_participant else None,
+                    text=current_text.strip(),
+                    duration_seconds=seg["start_time"] - current_start,
+                )
+                db.add(verse)
+
+                verses.append({
+                    "verse_number": verse_number,
+                    "speaker": current_speaker or "MC1",
+                    "text": current_text.strip(),
+                    "start_time": current_start,
+                    "end_time": seg["start_time"],
+                })
+                verse_number += 1
+                current_text = ""
+
+            current_speaker = speaker
+            current_text += " " + text if current_text else text
+            current_start = seg["start_time"]
+
+        # Save last verse
+        if current_text:
+            verse = Verse(
+                battle_id=battle_id,
+                verse_number=verse_number,
+                speaker=current_speaker,
+                participant_id=speaker_to_participant.get(current_speaker) if speaker_to_participant else None,
+                text=current_text.strip(),
+            )
+            db.add(verse)
+
             verses.append({
                 "verse_number": verse_number,
                 "speaker": current_speaker,
@@ -310,7 +336,7 @@ def segment_verses(
             })
 
         db.commit()
-        logger.info(f"Segmented {len(verses)} verses for battle {battle_id}")
+        logger.info(f"[SegmentVerses] Segmented {len(verses)} verses in {time.time() - t_start:.1f}s")
 
         return verses
 

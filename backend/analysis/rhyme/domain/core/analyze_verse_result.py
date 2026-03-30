@@ -4,7 +4,7 @@ class AnalyzeVerseResult:
         words: int,
         total_words: int,
         total_rhyming_words: int,
-        rhyme_pairs: int,
+        rhyme_pairs: list,
         rhyme_type_counts: int
     ):
         self.words = words

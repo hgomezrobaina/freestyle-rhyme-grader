@@ -3,11 +3,15 @@ Rhyme detection algorithm for Spanish rap lyrics.
 """
 
 import re
+import time
+import logging
 from typing import List, Dict, Tuple, Set
 from analysis.phonetic.transcriptor import SpanishPhoneticTranscriptor
 from analysis.phonetic.vowel_extractor import VowelExtractor
 from analysis.rhyme.types import RhymeType, RhymePattern
 from analysis.rhyme.domain.core.analyze_verse_result import AnalyzeVerseResult
+
+logger = logging.getLogger(__name__)
 
 
 class SpanishRhymeDetector:
@@ -107,7 +111,8 @@ class SpanishRhymeDetector:
         return is_rhyme, similarity
 
     def find_rhyming_pairs(
-        self, words: List[str]
+        self, 
+        words: List[str]
     ) -> Dict[str, List[RhymePattern]]:
         """
         Find all rhyming pairs in a word list.
@@ -116,12 +121,18 @@ class SpanishRhymeDetector:
             Dictionary mapping each word to its rhyming partners
         """
         rhyme_pairs = {}
+        total_comparisons = len(words) * (len(words) - 1) // 2
+        logger.info(f"[RhymeDetector] find_rhyming_pairs: {len(words)} words, {total_comparisons} comparisons to make")
+        t_start = time.time()
+        comparisons_done = 0
+        rhymes_found = 0
 
         for i, word in enumerate(words):
             rhyme_pairs[word] = []
 
             for j in range(i + 1, len(words)):
                 partner = words[j]
+                comparisons_done += 1
 
                 # Try consonant rhyme first
                 is_cons, cons_strength = self.detect_consonant_rhyme(word, partner)
@@ -135,6 +146,7 @@ class SpanishRhymeDetector:
                         syllable_count=2,  # Simplified
                     )
                     rhyme_pairs[word].append(pattern)
+                    rhymes_found += 1
                 else:
                     # Try assonant rhyme
                     is_asso, asso_strength = self.detect_assonant_rhyme(
@@ -149,7 +161,19 @@ class SpanishRhymeDetector:
                             syllable_count=2,
                         )
                         rhyme_pairs[word].append(pattern)
+                        rhymes_found += 1
 
+            # Log progress every 50 words
+            if (i + 1) % 50 == 0 or i == len(words) - 1:
+                elapsed = time.time() - t_start
+                logger.info(
+                    f"[RhymeDetector] Progress: word {i+1}/{len(words)}, "
+                    f"{comparisons_done}/{total_comparisons} comparisons, "
+                    f"{rhymes_found} rhymes found, {elapsed:.1f}s elapsed"
+                )
+
+        elapsed = time.time() - t_start
+        logger.info(f"[RhymeDetector] find_rhyming_pairs completed: {rhymes_found} rhymes in {elapsed:.1f}s")
         return rhyme_pairs
 
     def analyze_verse(self, text: str) -> AnalyzeVerseResult:
@@ -159,7 +183,9 @@ class SpanishRhymeDetector:
         Returns:
             Dictionary with rhyme metrics
         """
+        t_start = time.time()
         words = self._extract_words(text)
+        logger.info(f"[RhymeDetector] analyze_verse: extracted {len(words)} words from text ({len(text)} chars)")
         rhyme_pairs = self.find_rhyming_pairs(words)
 
         # Count total rhyming syllables (simplified)
@@ -176,6 +202,12 @@ class SpanishRhymeDetector:
                 rhyme_type_counts[rhyme_type] = (
                     rhyme_type_counts.get(rhyme_type, 0) + 1
                 )
+
+        elapsed = time.time() - t_start
+        logger.info(
+            f"[RhymeDetector] analyze_verse completed: {total_words} words, "
+            f"{total_rhyming_words} rhyming, types={rhyme_type_counts}, {elapsed:.1f}s"
+        )
 
         return AnalyzeVerseResult(
             words=words,

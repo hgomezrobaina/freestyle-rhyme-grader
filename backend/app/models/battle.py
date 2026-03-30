@@ -7,6 +7,7 @@ from app.database import Base
 class BattleStatus(str, enum.Enum):
     PENDING = "pending"
     PROCESSING = "processing"
+    DIARIZED = "diarized"
     COMPLETED = "completed"
     FAILED = "failed"
 

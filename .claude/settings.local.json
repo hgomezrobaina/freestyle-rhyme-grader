@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx next build:*)",
-      "Bash(docker compose exec postgres psql:*)"
+      "Bash(docker compose exec postgres psql:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

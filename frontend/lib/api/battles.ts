@@ -6,6 +6,8 @@ import type {
   BattleDetailResponse,
 } from "./types";
 
+import type { VerseResponse } from "./types";
+
 /**
  * Subir una batalla a partir de un archivo de video
  */
@@ -77,6 +79,36 @@ export async function getBattleDetail(
   const response = await fetch(`${API_BASE_URL}/api/battles/${battleId}`);
 
   return handleResponse<BattleDetailResponse>(response);
+}
+
+/**
+ * Disparar el analisis de rimas para una batalla ya diarizada
+ */
+export async function analyzeBattle(
+  battleId: number,
+): Promise<BattleResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/battles/${battleId}/analyze`,
+    { method: "POST" },
+  );
+
+  return handleResponse<BattleResponse>(response);
+}
+
+/**
+ * Actualizar el texto de un verso
+ */
+export async function updateVerse(
+  verseId: number,
+  data: { text?: string; speaker?: string },
+): Promise<VerseResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/verses/${verseId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  return handleResponse<VerseResponse>(response);
 }
 
 /**

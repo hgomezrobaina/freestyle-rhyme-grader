@@ -5,9 +5,11 @@ FastAPI application main entry point.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.database import Base, engine
 from app.api import battles_router, verses_router, ratings_router, youtube_router, upload_router, semantic_router, mc_context_router
+from pathlib import Path
 
 
 # Reset database on startup (drop all tables and recreate)
@@ -39,6 +41,11 @@ app.include_router(verses_router.router, prefix="/api/verses", tags=["verses"])
 app.include_router(ratings_router.router, prefix="/api/ratings", tags=["ratings"])
 app.include_router(semantic_router.router, prefix="/api/semantic", tags=["semantic"])  # Fase 3
 app.include_router(mc_context_router.router, prefix="/api/mc", tags=["mc_context"])  # Fase 4
+
+# Serve uploaded/temp media files
+temp_dir = Path(settings.TEMP_DIR)
+temp_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(temp_dir)), name="media")
 
 # Health check endpoint
 @app.get("/health")

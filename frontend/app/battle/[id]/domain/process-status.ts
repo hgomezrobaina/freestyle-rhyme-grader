@@ -1,6 +1,7 @@
 export enum ProcessStatus {
   PENDING = "pending",
   PROCESSING = "processing",
+  DIARIZED = "diarized",
   COMPLETED = "completed",
   FAILED = "failed",
 }

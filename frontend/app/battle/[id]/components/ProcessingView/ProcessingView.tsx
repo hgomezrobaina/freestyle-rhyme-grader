@@ -12,7 +12,6 @@ const STEPS = [
   { key: PipelineStep.TRANSCRIBE, label: "Transcribiendo con Whisper" },
   { key: PipelineStep.SEPARATE, label: "Separando voces" },
   { key: PipelineStep.DIARIZE, label: "Identificando MCs" },
-  { key: PipelineStep.ANALYZE, label: "Analizando rimas" },
 ];
 
 function getStepIndex(progressStep?: string): number {
@@ -35,7 +34,7 @@ export default function ProcessingView({ battleId }: { battleId: number }) {
         const detail = await getBattleDetail(battleId);
         if (!mounted) return;
 
-        if (detail.status === ProcessStatus.COMPLETED) {
+        if (detail.status === ProcessStatus.DIARIZED || detail.status === ProcessStatus.COMPLETED) {
           setStepIndex(STEPS.length);
           setStatus(ProcessStatus.COMPLETED);
           clearInterval(interval);

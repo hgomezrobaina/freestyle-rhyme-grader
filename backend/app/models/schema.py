@@ -27,6 +27,10 @@ class BattleParticipantResponse(BaseModel):
 class BattleParticipantRename(BaseModel):
     mc_name: str
 
+class VerseUpdate(BaseModel):
+    text: Optional[str] = None
+    speaker: Optional[str] = None
+
 class BattleResponse(BaseModel):
     id: int
     title: str

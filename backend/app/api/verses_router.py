@@ -5,7 +5,7 @@ API routes for verses.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.schema import VerseResponse, RhymeMetricResponse
+from app.models.schema import VerseResponse, VerseUpdate, RhymeMetricResponse
 from app.services.battle_service import BattleService
 
 router = APIRouter()
@@ -42,6 +42,27 @@ async def get_verse(verse_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Verse not found"
         )
 
+    return verse
+
+
+@router.patch("/{verse_id}", response_model=VerseResponse)
+async def update_verse(verse_id: int, update: VerseUpdate, db: Session = Depends(get_db)):
+    """Update a verse's text or speaker."""
+    from app.models.battle import Verse
+
+    verse = db.query(Verse).filter(Verse.id == verse_id).first()
+    if not verse:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Verse not found"
+        )
+
+    if update.text is not None:
+        verse.text = update.text.strip()
+    if update.speaker is not None:
+        verse.speaker = update.speaker.strip()
+
+    db.commit()
+    db.refresh(verse)
     return verse
 
 

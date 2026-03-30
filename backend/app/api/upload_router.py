@@ -2,7 +2,7 @@
 API routes for uploading battle audio/video files.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.schema import BattleResponse
@@ -14,6 +14,7 @@ from app.config import get_settings
 from pathlib import Path
 import json
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,13 +29,17 @@ ALLOWED_EXTENSIONS = {".mp3", ".wav", ".m4a", ".flac", ".mp4", ".mov", ".avi", "
 MAX_FILE_SIZE = settings.MAX_FILE_SIZE
 
 
-@router.post("/upload", response_model=BattleResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/upload", 
+    response_model=BattleResponse, 
+    status_code=status.HTTP_202_ACCEPTED
+)
 async def create_battle_from_upload(
     file: UploadFile = File(...),
-    title: str = None,
-    description: str = None,
-    battle_format: str = "1v1",
-    participants_json: str = None,
+    title: str = Form(None),
+    description: str = Form(None),
+    battle_format: str = Form("1v1"),
+    participants_json: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -79,12 +84,15 @@ async def create_battle_from_upload(
                 detail=f"File too large. Maximum size: {MAX_FILE_SIZE / (1024**3):.1f}GB"
             )
 
-        # Create battle record FIRST
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4().hex[:12]}{file_ext}"
+
+        # Create battle record FIRST (source_url set after saving file)
         battle = Battle(
             title=title,
             description=description,
             source_type=BattleSourceType.UPLOAD,
-            source_url=filename,  # Store original filename
+            source_url=filename,
             status=BattleStatus.PROCESSING,
             battle_format=BattleFormat(battle_format),
         )
@@ -112,12 +120,16 @@ async def create_battle_from_upload(
         battle_temp_dir = Path(settings.TEMP_DIR) / f"battle_{battle.id}"
         battle_temp_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save uploaded file
-        file_path = battle_temp_dir / filename
+        # Save uploaded file with unique name
+        file_path = battle_temp_dir / unique_filename
         contents = await file.read()
 
         with open(file_path, "wb") as f:
             f.write(contents)
+
+        # Store servable media URL
+        battle.source_url = f"/media/battle_{battle.id}/{unique_filename}"
+        db.commit()
 
         logger.info(f"Saved uploaded file: {file_path}")
 

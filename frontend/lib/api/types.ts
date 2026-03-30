@@ -1,5 +1,5 @@
 export type BattleSourceType = "youtube" | "upload" | "text";
-export type BattleStatus = "pending" | "processing" | "completed" | "failed";
+export type BattleStatus = "pending" | "processing" | "diarized" | "completed" | "failed";
 
 export interface BattleParticipantResponse {
   id: number;

@@ -37,7 +37,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.gpu
     container_name: freestyle_backend
     ports:
       - "8000:8000"
@@ -60,11 +60,13 @@ services:
   celery_worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.gpu
     container_name: freestyle_celery_worker
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=1
     env_file:
       - .env.docker
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - ./app:/app/app
       - ./analysis:/app/analysis
@@ -76,6 +78,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     networks:
       - freestyle_network
 

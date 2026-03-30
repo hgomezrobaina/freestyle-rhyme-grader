@@ -4,23 +4,26 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BattleView } from "@/components/battle-view";
-import { getBattleDetail } from "@/lib/api/battles";
+import { getBattleDetail, analyzeBattle } from "@/lib/api/battles";
 import type { BattleDetailResponse } from "@/lib/api/types";
 import { mapBattleDetailToBattle } from "@/lib/utils-battle";
 import type { Battle } from "@/lib/types/battle";
-import { Loader2, Mic2, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProcessingView from "./components/ProcessingView/ProcessingView";
+import BattleInfoView from "./components/BattleInfoView/BattleInfoView";
 
 export default function BattlePage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const isUploading = searchParams.get("uploading") === "true";
 
+  const [detail, setDetail] = useState<BattleDetailResponse | null>(null);
   const [battle, setBattle] = useState<Battle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showProcessing, setShowProcessing] = useState(isUploading);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const battleId = Number(params.id);
 
@@ -28,40 +31,38 @@ export default function BattlePage() {
     if (isNaN(battleId)) {
       setError("ID de batalla invalido");
       setLoading(false);
-
       return;
     }
 
     getBattleDetail(battleId)
-      .then((detail) => {
-        if (detail.status === "completed") {
-          setBattle(mapBattleDetailToBattle(detail));
+      .then((d) => {
+        setDetail(d);
+        if (d.status === "completed") {
+          setBattle(mapBattleDetailToBattle(d));
           setShowProcessing(false);
-          setLoading(false);
-        } else if (detail.status === "failed") {
+        } else if (d.status === "diarized") {
+          setBattle(mapBattleDetailToBattle(d));
+          setShowProcessing(false);
+        } else if (d.status === "failed") {
           setShowProcessing(true);
-          setLoading(false);
         } else if (
           isUploading ||
-          detail.status === "processing" ||
-          detail.status === "pending"
+          d.status === "processing" ||
+          d.status === "pending"
         ) {
           setShowProcessing(true);
-          setLoading(false);
         } else {
-          setBattle(mapBattleDetailToBattle(detail));
-          setLoading(false);
+          setBattle(mapBattleDetailToBattle(d));
         }
+        setLoading(false);
       })
       .catch((err) => {
         if (isUploading) {
-          // Battle might not be ready yet, show processing
           setShowProcessing(true);
-          setLoading(false);
         } else {
           setError(err.message || "Error al cargar la batalla");
-          setLoading(false);
         }
+        setLoading(false);
       });
   }, [battleId, isUploading]);
 
@@ -78,11 +79,18 @@ export default function BattlePage() {
 
     interval = setInterval(async () => {
       try {
-        const detail = await getBattleDetail(battleId);
+        const d = await getBattleDetail(battleId);
         if (!mounted) return;
-        if (detail.status === "completed") {
-          setBattle(mapBattleDetailToBattle(detail));
+        if (d.status === "diarized") {
+          setDetail(d);
+          setBattle(mapBattleDetailToBattle(d));
           setShowProcessing(false);
+          clearInterval(interval);
+        } else if (d.status === "completed") {
+          setDetail(d);
+          setBattle(mapBattleDetailToBattle(d));
+          setShowProcessing(false);
+          setAnalyzing(false);
           clearInterval(interval);
         }
       } catch {
@@ -95,6 +103,47 @@ export default function BattlePage() {
       clearInterval(interval);
     };
   }, [showProcessing, loading, battleId]);
+
+  // Poll while analyzing
+  useEffect(() => {
+    if (!analyzing) return;
+
+    let interval: NodeJS.Timeout;
+    let mounted = true;
+
+    interval = setInterval(async () => {
+      try {
+        const d = await getBattleDetail(battleId);
+        if (!mounted) return;
+        if (d.status === "completed") {
+          setDetail(d);
+          setBattle(mapBattleDetailToBattle(d));
+          setAnalyzing(false);
+          clearInterval(interval);
+        } else if (d.status === "failed") {
+          setDetail(d);
+          setAnalyzing(false);
+          clearInterval(interval);
+        }
+      } catch {
+        // keep polling
+      }
+    }, 3000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [analyzing, battleId]);
+
+  const handleAnalyze = async () => {
+    try {
+      setAnalyzing(true);
+      await analyzeBattle(battleId);
+    } catch {
+      setAnalyzing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -129,6 +178,18 @@ export default function BattlePage() {
           </Button>
         </div>
       </div>
+    );
+  }
+
+  // Battle is diarized but not yet analyzed
+  if (detail?.status === "diarized" || analyzing) {
+    return (
+      <BattleInfoView
+        battle={battle}
+        battleId={battleId}
+        analyzing={analyzing}
+        onAnalyze={handleAnalyze}
+      />
     );
   }
 

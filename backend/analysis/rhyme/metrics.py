@@ -2,10 +2,14 @@
 Metrics calculation for rhyme analysis.
 """
 
+import time
+import logging
 from typing import Dict
 from analysis.rhyme.detector import SpanishRhymeDetector
 from analysis.phonetic.syllable_counter import SpanishSyllableCounter
-from analysis.rhyme.domain.core.metric_calculator_result import MetricCalculatorResult 
+from analysis.rhyme.domain.core.metric_calculator_result import MetricCalculatorResult
+
+logger = logging.getLogger(__name__)
 
 class RhymeMetricsCalculator:
     """Calculate comprehensive rhyme metrics for a verse."""
@@ -14,7 +18,7 @@ class RhymeMetricsCalculator:
         self.detector = SpanishRhymeDetector()
         self.syllable_counter = SpanishSyllableCounter()
 
-    def calculate_metrics(self, text: str) -> Dict:
+    def calculate_metrics(self, text: str) -> MetricCalculatorResult:
         """
         Calculate all rhyme metrics for a verse.
 
@@ -24,11 +28,19 @@ class RhymeMetricsCalculator:
         Returns:
             Dictionary with all metrics
         """
+        t_start = time.time()
+        text_preview = text[:80] + "..." if len(text) > 80 else text
+        logger.info(f"[RhymeMetrics] calculate_metrics START: '{text_preview}' ({len(text)} chars)")
+
         # Analyze verse
+        t0 = time.time()
         analysis = self.detector.analyze_verse(text)
+        logger.info(f"[RhymeMetrics] analyze_verse took {time.time() - t0:.1f}s")
 
         # Calculate syllables
+        t0 = time.time()
         total_syllables = self.syllable_counter.count_syllables_in_text(text)
+        logger.info(f"[RhymeMetrics] count_syllables took {time.time() - t0:.1f}s")
 
         # Basic metrics
         total_words = analysis.total_words
@@ -45,7 +57,7 @@ class RhymeMetricsCalculator:
 
         # Multisyllabic ratio (simplified: count pairs with 2+ syllables)
         total_rhymes = sum(
-            len(patterns) for patterns in analysis["rhyme_pairs"].values()
+            len(patterns) for patterns in analysis.rhyme_pairs.values()
         )
         multisyllabic_count = rhyme_types.get("multisyllabic", 0)
         multisyllabic_ratio = (
@@ -58,6 +70,12 @@ class RhymeMetricsCalculator:
         # Rhyme diversity: how many different rhyme types used
         rhyme_diversity = len([v for v in rhyme_types.values() if v > 0]) / 5.0
 
+        elapsed = time.time() - t_start
+        logger.info(
+            f"[RhymeMetrics] calculate_metrics DONE in {elapsed:.1f}s: "
+            f"density={rhyme_density:.3f}, syllables={total_syllables}, diversity={rhyme_diversity:.2f}"
+        )
+
         return MetricCalculatorResult(
             rhyme_density=rhyme_density,
             multisyllabic_ratio=multisyllabic_ratio,
@@ -67,7 +85,7 @@ class RhymeMetricsCalculator:
             rhyme_types=rhyme_types,
         )
 
-    def get_descriptive_analysis(self, metrics: Dict) -> str:
+    def get_descriptive_analysis(self, metrics: MetricCalculatorResult) -> str:
         """
         Get a human-readable description of the metrics.
 
@@ -77,8 +95,8 @@ class RhymeMetricsCalculator:
         Returns:
             String description
         """
-        density = metrics["rhyme_density"]
-        diversity = metrics["rhyme_diversity"]
+        density = metrics.rhyme_density
+        diversity = metrics.rhyme_diversity
 
         if density < 0.05:
             density_desc = "muy baja"

@@ -5,9 +5,11 @@ API routes for battles.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.models.battle import Battle, BattleStatus
 from app.models.schema import TextBattleInput, BattleResponse, BattleDetailResponse, BattleParticipantRename, BattleParticipantResponse
 from app.models.mc_context import BattleParticipant
 from app.services.battle_service import BattleService
+from app.tasks.pipeline import analyze_battle
 
 router = APIRouter()
 battle_service = BattleService()
@@ -49,6 +51,28 @@ async def list_battles(skip: int = 0, limit: int = 100, db: Session = Depends(ge
     """List all battles with pagination."""
     battles = battle_service.get_all_battles(db, skip=skip, limit=limit)
     return battles
+
+
+@router.post("/{battle_id}/analyze", response_model=BattleResponse)
+async def trigger_analysis(battle_id: int, db: Session = Depends(get_db)):
+    """Trigger verse segmentation and rhyme analysis for a diarized battle."""
+    battle = db.query(Battle).filter(Battle.id == battle_id).first()
+    if not battle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Battle not found")
+
+    if battle.status not in (BattleStatus.DIARIZED, BattleStatus.FAILED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Battle is not ready for analysis (status={battle.status})",
+        )
+
+    battle.status = BattleStatus.PROCESSING
+    battle.progress_step = "analyze"
+    db.commit()
+    db.refresh(battle)
+
+    analyze_battle.delay(battle_id)
+    return battle
 
 
 @router.patch(

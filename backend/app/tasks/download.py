@@ -38,7 +38,7 @@ def download_youtube_video(self, battle_id: int, url: str) -> dict:
     db = SessionLocal()
     try:
         logger.info(f"Starting download for battle {battle_id}")
-        _update('PROCESSING', {'status': 'Downloading from YouTube...'})
+        _update('PROCESSING', { 'status': 'Downloading from YouTube...' })
 
         # Update battle status
         battle = db.query(Battle).filter(Battle.id == battle_id).first()

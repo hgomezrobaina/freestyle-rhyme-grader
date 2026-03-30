@@ -3,8 +3,12 @@ Module for phonetic transcription of Spanish text to IPA.
 Uses phonemizer library with espeak-ng backend.
 """
 
+import time
+import logging
 from phonemizer import phonemize
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 class SpanishPhoneticTranscriptor:
@@ -13,6 +17,8 @@ class SpanishPhoneticTranscriptor:
     def __init__(self):
         self.backend = "espeak"
         self.language = "es"
+        self._call_count = 0
+        self._total_time = 0.0
 
     def transcribe_word(self, word: str) -> str:
         """
@@ -25,6 +31,7 @@ class SpanishPhoneticTranscriptor:
             IPA representation
         """
         try:
+            t0 = time.time()
             ipa = phonemize(
                 word,
                 language=self.language,
@@ -32,9 +39,20 @@ class SpanishPhoneticTranscriptor:
                 strip=True,
                 preserve_punctuation=False,
             )
+            elapsed = time.time() - t0
+            self._call_count += 1
+            self._total_time += elapsed
+
+            # Log every 200 calls to avoid log spam
+            if self._call_count % 200 == 0:
+                logger.info(
+                    f"[Transcriptor] {self._call_count} phonemize calls, "
+                    f"total={self._total_time:.1f}s, avg={self._total_time/self._call_count*1000:.1f}ms/call"
+                )
+
             return ipa
         except Exception as e:
-            print(f"Error transcribing word '{word}': {e}")
+            logger.error(f"Error transcribing word '{word}': {e}")
             return word
 
     def transcribe_text(self, text: str) -> str:
